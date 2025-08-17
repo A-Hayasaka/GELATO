@@ -34,6 +34,9 @@ from .utils_c import (
     dynamic_pressure_array_pa,
     angle_of_attack_all_array_rad,
     q_alpha_array_pa_rad,
+    q_alpha_dimless,
+    q_alpha_array_dimless,
+    q_alpha_gradient_dimless_core,
 )
 from .coordinate_c import *
 
@@ -68,22 +71,6 @@ def angle_of_attack_all_array_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, uni
     vel_eci = vel_eci_e * units[1]
     t = t_e * units[2]
     return angle_of_attack_all_array_rad(pos_eci, vel_eci, quat, t, wind) / units[3]
-
-
-def q_alpha_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
-    """Returns Q-alpha normalized by its maximum value."""
-    pos_eci = pos_eci_e * units[0]
-    vel_eci = vel_eci_e * units[1]
-    t = t_e * units[2]
-    return q_alpha_pa_rad(pos_eci, vel_eci, quat, t, wind) / units[3]
-
-
-def q_alpha_array_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
-    """Returns array of Q-alpha for each state values."""
-    pos_eci = pos_eci_e * units[0]
-    vel_eci = vel_eci_e * units[1]
-    t = t_e * units[2]
-    return q_alpha_array_pa_rad(pos_eci, vel_eci, quat, t, wind) / units[3]
 
 
 def inequality_max_alpha(xdict, pdict, unitdict, condition):
@@ -371,6 +358,7 @@ def angle_of_attack_all_gradient_dimless(
     return grad
 
 
+@profile
 def inequality_jac_max_alpha(xdict, pdict, unitdict, condition):
     """Jacobian of inequality_max_alpha."""
 
@@ -605,18 +593,12 @@ def inequality_jac_max_q(xdict, pdict, unitdict, condition):
     return jac
 
 
+@profile
 def q_alpha_gradient_dimless(
     pos_eci_e, vel_eci_e, quat, to, tf, wind, units, time_nodes, dx, n
 ):
     """Returns gradient of Q-alpha."""
     ki = range(n)
-    grad = {
-        "position": np.zeros((n, 3)),
-        "velocity": np.zeros((n, 3)),
-        "quaternion": np.zeros((n, 4)),
-        "to": np.zeros(n),
-        "tf": np.zeros(n),
-    }
 
     pos_ki = pos_eci_e[ki]
     vel_ki = vel_eci_e[ki]
@@ -625,39 +607,12 @@ def q_alpha_gradient_dimless(
     t_nodes = time_nodes(to, tf)
     t_ki = t_nodes[ki]
 
-    f_c = q_alpha_array_dimless(pos_ki, vel_ki, quat_ki, t_ki, wind, units)
+    grad2 = q_alpha_gradient_dimless_core(
+        n, pos_ki, vel_ki, quat_ki, t_ki, wind, units, dx
+    )
+    return grad2
 
-    for j in range(3):
-        pos_ki[:, j] += dx
-        f_p = q_alpha_array_dimless(pos_ki, vel_ki, quat_ki, t_ki, wind, units)
-        pos_ki[:, j] -= dx
-        grad["position"][:, j] = (f_p - f_c) / dx
-
-    for j in range(3):
-        vel_ki[:, j] += dx
-        f_p = q_alpha_array_dimless(pos_ki, vel_ki, quat_ki, t_ki, wind, units)
-        vel_ki[:, j] -= dx
-        grad["velocity"][:, j] = (f_p - f_c) / dx
-
-    for j in range(4):
-        quat_ki[:, j] += dx
-        f_p = q_alpha_array_dimless(pos_ki, vel_ki, quat_ki, t_ki, wind, units)
-        quat_ki[:, j] -= dx
-        grad["quaternion"][:, j] = (f_p - f_c) / dx
-
-    to_p = to + dx
-    t_nodes_p1 = time_nodes(to_p, tf)
-    f_p = q_alpha_array_dimless(pos_ki, vel_ki, quat_ki, t_nodes_p1[ki], wind, units)
-    grad["to"] = (f_p - f_c) / dx
-
-    tf_p = tf + dx
-    t_nodes_p2 = time_nodes(to, tf_p)
-    f_p = q_alpha_array_dimless(pos_ki, vel_ki, quat_ki, t_nodes_p2[ki], wind, units)
-    grad["tf"] = (f_p - f_c) / dx
-
-    return grad
-
-
+@profile
 def inequality_jac_max_qalpha(xdict, pdict, unitdict, condition):
     """Jacobian of inequality_max_qalpha."""
 

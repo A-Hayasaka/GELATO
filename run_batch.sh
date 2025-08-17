@@ -75,7 +75,8 @@ mkdir output
 for file in `find . -maxdepth 1 -name '*.json'`; do
     echo $file
     # Execute in temporary folder with PYTHONPATH set
-    PYTHONPATH=".:$GELATO_DIR:$PYTHONPATH" python3 "$GELATO_DIR/Trajectory_Optimization.py" $file
+    PYTHONPATH=".:$GELATO_DIR:$PYTHONPATH" kernprof -l "$GELATO_DIR/Trajectory_Optimization.py" $file
+    PYTHONPATH=".:$GELATO_DIR:$PYTHONPATH" python3 -m line_profiler -rmt Trajectory_Optimization.py.lprof > output/line_profile.txt
 done
 
 # Copy results back to original location

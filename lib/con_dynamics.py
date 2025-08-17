@@ -31,6 +31,7 @@ import numpy as np
 from .dynamics_c import dynamics_velocity, dynamics_velocity_NoAir, dynamics_quaternion
 
 
+@profile
 def equality_dynamics_mass(xdict, pdict, unitdict, condition):
     """Equality constraint about dynamics of mass."""
 
@@ -63,6 +64,7 @@ def equality_dynamics_mass(xdict, pdict, unitdict, condition):
     return np.concatenate(con, axis=None)
 
 
+@profile
 def equality_jac_dynamics_mass(xdict, pdict, unitdict, condition):
     """Jacobian of equality_dynamics_mass."""
 
@@ -113,6 +115,7 @@ def equality_jac_dynamics_mass(xdict, pdict, unitdict, condition):
     return jac
 
 
+@profile
 def equality_dynamics_position(xdict, pdict, unitdict, condition):
     """Equality constraint about dynamics of position."""
 
@@ -152,6 +155,7 @@ def equality_dynamics_position(xdict, pdict, unitdict, condition):
     return np.concatenate(con, axis=None)
 
 
+@profile
 def equality_jac_dynamics_position(xdict, pdict, unitdict, condition):
     """Jacobian of equality_dynamics_position."""
 
@@ -213,6 +217,7 @@ def equality_jac_dynamics_position(xdict, pdict, unitdict, condition):
     return jac
 
 
+@profile
 def equality_dynamics_velocity(xdict, pdict, unitdict, condition):
     """Equality constraint about dynamics of velocity."""
 
@@ -289,6 +294,7 @@ def equality_dynamics_velocity(xdict, pdict, unitdict, condition):
     return np.concatenate(con, axis=None)
 
 
+@profile
 def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
     """Jacobian of equality_dynamics_velocity."""
 
@@ -495,7 +501,7 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
 
     return jac
 
-
+@profile
 def equality_dynamics_quaternion(xdict, pdict, unitdict, condition):
     """Equality constraint about dynamics of quaternion."""
 
@@ -532,7 +538,7 @@ def equality_dynamics_quaternion(xdict, pdict, unitdict, condition):
 
     return np.concatenate(con, axis=None)
 
-
+@profile
 def equality_jac_dynamics_quaternion(xdict, pdict, unitdict, condition):
     """Jacobian of equality_dynamics_quaternion."""
 

@@ -169,6 +169,7 @@ def inequality_jac_kickturn(xdict, pdict, unitdict, condition):
     return jac
 
 
+@profile
 def equality_6DoF_rate(xdict, pdict, unitdict, condition):
     """Equality constraint about angular rate."""
 
@@ -289,6 +290,7 @@ def roll_direction_array_gradient(pos, quat, unit_pos, dx):
     return grad
 
 
+@profile
 def equality_jac_6DoF_rate(xdict, pdict, unitdict, condition):
     """Jacobian of equality_rate."""
 

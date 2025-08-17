@@ -1,8 +1,8 @@
 
 CC = g++
 CFLAGS = -O2 -Wall -shared -std=c++11 -I/usr/include/eigen3 -fPIC -rdynamic
-PYBIND = `python3 -m pybind11 --includes`
-PYCONFIG = `python3-config --extension-suffix`
+PYBIND = `python -m pybind11 --includes`
+PYCONFIG = `python -m pybind11 --extension-suffix`
 
 SRCS = src/Air.cpp src/Earth.cpp src/gravity.cpp src/Coordinate.cpp src/iip.cpp
 
