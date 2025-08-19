@@ -222,7 +222,7 @@ vecXd q_alpha_array_dimless(matXd pos_eci_e, matXd vel_eci_e, matXd quat,
                                  quat.row(i), t_e(i), wind, units);
   }
 
-  return q_alpha / units[3];
+  return q_alpha;
 }
 
 py::dict q_alpha_gradient_dimless_core(int n, matXd pos_ki, matXd vel_ki,
