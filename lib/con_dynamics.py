@@ -28,7 +28,7 @@
 
 from itertools import chain, repeat
 import numpy as np
-from .dynamics_c import dynamics_velocity, dynamics_velocity_NoAir, dynamics_quaternion
+from .dynamics_c import dynamics_velocity, dynamics_quaternion
 
 
 @profile
@@ -259,36 +259,22 @@ def equality_dynamics_velocity(xdict, pdict, unitdict, condition):
         ca = pdict["ca_table"]
 
         lh = pdict["ps_params"].D(i).dot(vel_i_)
-        if param[2] == 0.0:
-            rh = (
-                dynamics_velocity_NoAir(
-                    mass_i_[1:],
-                    pos_i_[1:],
-                    quat_i_[1:],
-                    param,
-                    units,
-                )
-                * (tf - to)
-                * unit_t
-                / 2.0
+        rh = (
+            dynamics_velocity(
+                mass_i_[1:],
+                pos_i_[1:],
+                vel_i_[1:],
+                quat_i_[1:],
+                t_nodes[1:],
+                param,
+                wind,
+                ca,
+                units,
             )
-        else:
-            rh = (
-                dynamics_velocity(
-                    mass_i_[1:],
-                    pos_i_[1:],
-                    vel_i_[1:],
-                    quat_i_[1:],
-                    t_nodes[1:],
-                    param,
-                    wind,
-                    ca,
-                    units,
-                )
-                * (tf - to)
-                * unit_t
-                / 2.0
-            )
+            * (tf - to)
+            * unit_t
+            / 2.0
+        )
         con.append((lh - rh).ravel())
 
     return np.concatenate(con, axis=None)
@@ -348,30 +334,30 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
         submat_vel[1::3, 1::3] = pdict["ps_params"].D(i)
         submat_vel[2::3, 2::3] = pdict["ps_params"].D(i)
 
-        def dynamics(mass, pos, vel, quat, t):
-            if param[2] == 0.0:
-                return dynamics_velocity_NoAir(mass, pos, quat, param, units)
-            else:
-                return dynamics_velocity(
-                    mass, pos, vel, quat, t, param, wind, ca, units
-                )
-
-        f_center = dynamics(
+        f_center = dynamics_velocity(
             mass_i_[1:],
             pos_i_[1:],
             vel_i_[1:],
             quat_i_[1:],
             t_nodes[1:],
+            param,
+            wind,
+            ca,
+            units
         )
 
         # mass
         mass_i_[1:] += dx
-        f_p = dynamics(
+        f_p = dynamics_velocity(
             mass_i_[1:],
             pos_i_[1:],
             vel_i_[1:],
             quat_i_[1:],
             t_nodes[1:],
+            param,
+            wind,
+            ca,
+            units
         )
         mass_i_[1:] -= dx
 
@@ -387,12 +373,16 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
         # position
         for k in range(3):
             pos_i_[1:, k] += dx
-            f_p = dynamics(
+            f_p = dynamics_velocity(
                 mass_i_[1:],
                 pos_i_[1:],
                 vel_i_[1:],
                 quat_i_[1:],
                 t_nodes[1:],
+                param,
+                wind,
+                ca,
+                units
             )
             pos_i_[1:, k] -= dx
             rh_pos = -(f_p - f_center) / dx * (tf - to) * unit_t / 2.0  # rh acc pos
@@ -405,16 +395,20 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
             )
             jac["position"]["coo"][2].extend(rh_pos.ravel())
 
-        # velocity
+        # velocity: changes only affect aerodynamic forces
         if param[2] > 0.0:
             for k in range(3):
                 vel_i_[1:, k] += dx
-                f_p = dynamics(
+                f_p = dynamics_velocity(
                     mass_i_[1:],
                     pos_i_[1:],
                     vel_i_[1:],
                     quat_i_[1:],
                     t_nodes[1:],
+                    param,
+                    wind,
+                    ca,
+                    units
                 )
                 vel_i_[1:, k] -= dx
                 rh_vel = -(f_p - f_center) / dx * (tf - to) * unit_t / 2.0
@@ -436,12 +430,16 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
         # quaternion
         for k in range(4):
             quat_i_[1:, k] += dx
-            f_p = dynamics(
+            f_p = dynamics_velocity(
                 mass_i_[1:],
                 pos_i_[1:],
                 vel_i_[1:],
                 quat_i_[1:],
                 t_nodes[1:],
+                param,
+                wind,
+                ca,
+                units
             )
             quat_i_[1:, k] -= dx
             rh_quat = -(f_p - f_center) / dx * (tf - to) * unit_t / 2.0  # rh acc quat
@@ -454,29 +452,36 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
             )
             jac["quaternion"]["coo"][2].extend(rh_quat.ravel())
 
-        # t_o, t_f
-        to_p = to + dx
-
+        # t_o, t_f: changes only affect aerodynamic forces
         if param[2] > 0.0:
+            to_p = to + dx
             t_i_p1_ = pdict["ps_params"].time_nodes(i, to_p, tf)
-            f_p = dynamics(
+            f_p = dynamics_velocity(
                 mass_i_[1:],
                 pos_i_[1:],
                 vel_i_[1:],
                 quat_i_[1:],
                 t_i_p1_[1:],
+                param,
+                wind,
+                ca,
+                units
             )
             rh_to = (
                 -(f_p * (tf - to_p) - f_center * (tf - to)).ravel() / dx * unit_t / 2.0
             )
             tf_p = tf + dx
             t_i_p2_ = pdict["ps_params"].time_nodes(i, to, tf_p)
-            f_p = dynamics(
+            f_p = dynamics_velocity(
                 mass_i_[1:],
                 pos_i_[1:],
                 vel_i_[1:],
                 quat_i_[1:],
                 t_i_p2_[1:],
+                param,
+                wind,
+                ca,
+                units
             )
             rh_tf = (
                 -(f_p * (tf_p - to) - f_center * (tf - to)).ravel() / dx * unit_t / 2.0

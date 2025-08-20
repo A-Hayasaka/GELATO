@@ -595,7 +595,7 @@ def inequality_jac_max_q(xdict, pdict, unitdict, condition):
 
 @profile
 def q_alpha_gradient_dimless(
-    pos_eci_e, vel_eci_e, quat, to, tf, wind, units, time_nodes, dx, n
+    pos_eci_e, vel_eci_e, quat, wind, units, t_nodes, dx, n
 ):
     """Returns gradient of Q-alpha."""
     ki = range(n)
@@ -604,7 +604,6 @@ def q_alpha_gradient_dimless(
     vel_ki = vel_eci_e[ki]
     quat_ki = quat[ki]
 
-    t_nodes = time_nodes(to, tf)
     t_ki = t_nodes[ki]
 
     grad2 = q_alpha_gradient_dimless_core(
@@ -666,11 +665,10 @@ def inequality_jac_max_qalpha(xdict, pdict, unitdict, condition):
             elif condition["Q_alpha_max"][section_name]["range"] == "initial":
                 nk = 1
 
-            def time_nodes(t1, t2):
-                return pdict["ps_params"].time_nodes(i, t1, t2)
+            t_nodes = pdict["ps_params"].time_nodes(i, to, tf)
 
             dfdx = q_alpha_gradient_dimless(
-                pos_i_, vel_i_, quat_i_, to, tf, wind, units, time_nodes, dx, nk
+                pos_i_, vel_i_, quat_i_, wind, units, t_nodes, dx, nk
             )
             for j in range(3):
                 jac["position"]["coo"][0].extend(range(iRow, iRow + nk))
