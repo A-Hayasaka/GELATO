@@ -29,19 +29,8 @@
 
 import sys
 import numpy as np
-from .utils_c import *
+from .utils_c import roll_direction_array, roll_direction_array_gradient
 from .coordinate_c import conj, quatrot, normalize
-
-
-def yb_r_dot(pos_eci, quat_eci2body):
-    """Returns sine of roll angles."""
-    yb_dir_eci = quatrot(conj(quat_eci2body), np.array([0.0, 1.0, 0.0]))
-    return yb_dir_eci.dot(normalize(pos_eci))
-
-
-def roll_direction_array(pos, quat):
-    """Returns array of sine of roll angles for each state values."""
-    return np.array([yb_r_dot(pos[i], quat[i]) for i in range(len(pos))])
 
 
 def inequality_mass(xdict, pdict, unitdict, condition):
@@ -265,29 +254,6 @@ def equality_length_6DoF_rate(xdict, pdict, unitdict, condition):
             sys.exit()
 
     return res
-
-
-def roll_direction_array_gradient(pos, quat, unit_pos, dx):
-    grad = {
-        "position": np.zeros((len(pos), 3)),
-        "quaternion": np.zeros((len(pos), 4)),
-    }
-
-    f_c = roll_direction_array(pos * unit_pos, quat)
-
-    for j in range(3):
-        pos[:, j] += dx
-        f_p = roll_direction_array(pos * unit_pos, quat)
-        pos[:, j] -= dx
-        grad["position"][:, j] = (f_p - f_c) / dx
-
-    for j in range(4):
-        quat[:, j] += dx
-        f_p = roll_direction_array(pos * unit_pos, quat)
-        quat[:, j] -= dx
-        grad["quaternion"][:, j] = (f_p - f_c) / dx
-
-    return grad
 
 
 @profile

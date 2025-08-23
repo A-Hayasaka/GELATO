@@ -52,4 +52,8 @@ PYBIND11_MODULE(utils_c, m) {
         "array of states");
   m.def("q_alpha_gradient_dimless_core", &q_alpha_gradient_dimless_core,
       "Gradient of dynamic pressure times angle of attack in dimensionless form");
+  m.def("roll_direction_array", &roll_direction_array,
+      "Roll direction in radians for an array of states");
+  m.def("roll_direction_array_gradient", &roll_direction_array_gradient,
+      "Gradient of roll direction in radians for an array of states");
 }
