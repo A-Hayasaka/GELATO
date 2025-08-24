@@ -27,13 +27,12 @@
 #include "wrapper_coordinate.hpp"
 #include "wrapper_utils.hpp"
 
-matXd dynamics_velocity(vecXd mass_e, matXd pos_eci_e, matXd vel_eci_e,
-                        matXd quat_eci2body, vecXd t, vecXd param,
+vec3d dynamics_velocity(double mass_e, vec3d pos_eci_e, vec3d vel_eci_e,
+                        vec4d quat_eci2body, double t, vecXd param,
                         matXd wind_table, matXd CA_table, vecXd units) {
-  vecXd mass = mass_e * units[0];
-  matXd pos_eci = pos_eci_e * units[1];
-  matXd vel_eci = vel_eci_e * units[2];
-  matXd acc_eci = matXd::Zero(pos_eci.rows(), 3);
+  double mass = mass_e * units[0];
+  vec3d pos_eci = pos_eci_e * units[1];
+  vec3d vel_eci = vel_eci_e * units[2];
 
   double thrust_vac = param[0];
   double air_area = param[2];
@@ -43,44 +42,66 @@ matXd dynamics_velocity(vecXd mass_e, matXd pos_eci_e, matXd vel_eci_e,
   double thrust = thrust_vac;
   bool use_air = (air_area > 0.0);
 
-  for (int i = 0; i < mass.rows(); i++) {
 
-    if (use_air) {
-      vec3d pos_llh = ecef2geodetic(pos_eci(i, 0), pos_eci(i, 1), pos_eci(i, 2));
-      double altitude = geopotential_altitude(pos_llh[2]);
-      double rho = airdensity_at(altitude);
-      double p = airpressure_at(altitude);
+  if (use_air) {
+    vec3d pos_llh = ecef2geodetic(pos_eci[0], pos_eci[1], pos_eci[2]);
+    double altitude = geopotential_altitude(pos_llh[2]);
+    double rho = airdensity_at(altitude);
+    double p = airpressure_at(altitude);
 
-      vec3d vel_ecef = vel_eci2ecef(vel_eci.row(i), pos_eci.row(i), t[i]);
-      vec3d vel_wind_ned = wind_ned(altitude, wind_table);
+    vec3d vel_ecef = vel_eci2ecef(vel_eci, pos_eci, t);
+    vec3d vel_wind_ned = wind_ned(altitude, wind_table);
 
-      vec3d vel_wind_eci =
-          quatrot(quat_nedg2eci(pos_eci.row(i), t[i]), vel_wind_ned);
-      vec3d vel_air_eci = ecef2eci(vel_ecef, t[i]) - vel_wind_eci;
-      double mach_number = vel_air_eci.norm() / speed_of_sound(altitude);
+    vec3d vel_wind_eci =
+        quatrot(quat_nedg2eci(pos_eci, t), vel_wind_ned);
+    vec3d vel_air_eci = ecef2eci(vel_ecef, t) - vel_wind_eci;
+    double mach_number = vel_air_eci.norm() / speed_of_sound(altitude);
 
-      double ca = interp(mach_number, CA_table.col(0), CA_table.col(1));
+    double ca = interp(mach_number, CA_table.col(0), CA_table.col(1));
 
-      aeroforce_eci =
-          0.5 * rho * air_area * ca * vel_air_eci.norm() * -vel_air_eci;
+    aeroforce_eci =
+        0.5 * rho * air_area * ca * vel_air_eci.norm() * -vel_air_eci;
 
-      thrust = thrust_vac - nozzle_area * p;
-    } else {
-      aeroforce_eci.setZero();
-      thrust = thrust_vac;
-    }
-    vec3d thrustdir_eci =
-        quatrot(conj(quat_eci2body.row(i)), vec3d(1.0, 0.0, 0.0));
-    vec3d thrust_eci = thrust * thrustdir_eci;
-    vec3d gravity_eci = gravity(pos_eci.row(i));
-    vec3d acc_i = (thrust_eci + aeroforce_eci) / mass[i] + gravity_eci;
-    acc_eci.row(i) = acc_i;
+    thrust = thrust_vac - nozzle_area * p;
+  } else {
+    aeroforce_eci.setZero();
+    thrust = thrust_vac;
   }
+  vec3d thrustdir_eci =
+      quatrot(conj(quat_eci2body), vec3d(1.0, 0.0, 0.0));
+  vec3d thrust_eci = thrust * thrustdir_eci;
+  vec3d gravity_eci = gravity(pos_eci);
+  vec3d acc_eci = (thrust_eci + aeroforce_eci) / mass + gravity_eci;
 
   return acc_eci / units[2];
 }
 
-matXd dynamics_quaternion(matXd quat_eci2body, matXd u_e, double unit_u) {
+matXd dynamics_velocity_array(vecXd mass_e, matXd pos_eci_e, matXd vel_eci_e,
+                        matXd quat_eci2body, vecXd t, vecXd param,
+                        matXd wind_table, matXd CA_table, vecXd units) {
+
+  matXd acc_eci_e = matXd::Zero(pos_eci_e.rows(), 3);
+  for (int i = 0; i < pos_eci_e.rows(); i++) {
+    acc_eci_e.row(i) = dynamics_velocity(mass_e(i), pos_eci_e.row(i), vel_eci_e.row(i),
+                        quat_eci2body.row(i), t(i), param,
+                        wind_table, CA_table, units);
+  }
+
+  return acc_eci_e;
+}
+
+vec4d dynamics_quaternion(vec4d quat_eci2body, vec3d u_e, double unit_u) {
+  vec3d u = u_e * unit_u;
+
+  vec4d omega_rps_body = vec4d(0.0, u(0), u(1), u(2));
+  omega_rps_body = omega_rps_body * M_PI / 180.0;
+  vec4d d_quat = 0.5 * quatmult(quat_eci2body, omega_rps_body);
+
+  return d_quat;
+}
+
+
+matXd dynamics_quaternion_array(matXd quat_eci2body, matXd u_e, double unit_u) {
   matXd u = u_e * unit_u;
   matXd d_quat = matXd::Zero(quat_eci2body.rows(), 4);
 
@@ -97,5 +118,9 @@ matXd dynamics_quaternion(matXd quat_eci2body, matXd u_e, double unit_u) {
 PYBIND11_MODULE(dynamics_c, m) {
   m.def("dynamics_velocity", &dynamics_velocity,
         "velocity with aerodynamic forces");
+  m.def("dynamics_velocity_array", &dynamics_velocity_array,
+        "velocity with aerodynamic forces (array)");
   m.def("dynamics_quaternion", &dynamics_quaternion, "quaternion dynamics");
+  m.def("dynamics_quaternion_array", &dynamics_quaternion_array,
+        "quaternion dynamics array");
 }
