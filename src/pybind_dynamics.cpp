@@ -115,12 +115,141 @@ matXd dynamics_quaternion_array(matXd quat_eci2body, matXd u_e, double unit_u) {
   return d_quat;
 }
 
+py::dict dynamics_velocity_rh_gradient(
+  double mass, vec3d pos, vec3d vel, vec4d quat, double t,
+  vecXd param, matXd wind_table, matXd CA_table, vecXd units,
+  double to, double tf, double unit_time, double dx
+) {
+
+
+  vec3d f_c = dynamics_velocity(
+    mass, pos, vel, quat, t, param, wind_table, CA_table, units
+  );
+
+  // mass
+  vec3d grad_mass = vec3d::Zero();
+  mass += dx;
+  vec3d f_p_mass = dynamics_velocity(
+    mass, pos, vel, quat, t, param, wind_table, CA_table, units
+  );
+  mass -= dx;
+  grad_mass = -(f_p_mass - f_c) / dx * (tf - to) * unit_time / 2.0;
+
+  // position
+  mat3d grad_position = mat3d::Zero();
+  for (int k = 0; k < 3; k++) {
+    pos(k) += dx;
+    vec3d f_p_pos = dynamics_velocity(
+      mass, pos, vel, quat, t, param, wind_table, CA_table, units
+    );
+    pos(k) -= dx;
+    grad_position.col(k) = -(f_p_pos - f_c) / dx * (tf - to) * unit_time / 2.0;
+  }
+
+  // velocity: changes only affect aerodynamic forces
+  mat3d grad_velocity = mat3d::Zero();
+  if (param[2] > 0.0) {
+    for (int k = 0; k < 3; k++) {
+      vel(k) += dx;
+      vec3d f_p_vel = dynamics_velocity(
+        mass, pos, vel, quat, t, param, wind_table, CA_table, units
+      );
+      vel(k) -= dx;
+      grad_velocity.col(k) = -(f_p_vel - f_c) / dx * (tf - to) * unit_time / 2.0;
+    }
+  }
+
+  // quaternion
+  matXd grad_quaternion = matXd::Zero(3, 4);
+  for (int k = 0; k < 4; k++) {
+    quat(k) += dx;
+    vec3d f_p_quat = dynamics_velocity(
+      mass, pos, vel, quat, t, param, wind_table, CA_table, units
+    );
+    quat(k) -= dx;
+    grad_quaternion.col(k) = -(f_p_quat - f_c) / dx * (tf - to) * unit_time / 2.0;
+  }
+
+  // to, tf: changes only affect aerodynamic forces
+  vec3d grad_to = vec3d::Zero();
+  vec3d grad_tf = vec3d::Zero();
+  if (param[2] > 0.0) {
+    double to_p = to + dx;
+    double t_p1 = to_p + t / (tf - to) * (tf - to_p);
+    vec3d f_p_to = dynamics_velocity(
+      mass, pos, vel, quat, t_p1, param, wind_table, CA_table, units
+    );
+    grad_to = -(f_p_to * (tf - to_p) - f_c * (tf - to)) / dx * unit_time / 2.0;
+
+    double tf_p = tf + dx;
+    double t_p2 = to + t / (tf - to) * (tf_p - to);
+    vec3d f_p_tf = dynamics_velocity(
+      mass, pos, vel, quat, t_p2, param, wind_table, CA_table, units
+    );
+    grad_tf = -(f_p_tf * (tf_p - to) - f_c * (tf - to)) / dx * unit_time / 2.0;
+  } else {
+    grad_to = f_c * unit_time / 2.0;
+    grad_tf = -grad_to;
+  }
+
+  py::dict grad;
+  grad["mass"] = grad_mass;
+  grad["position"] = grad_position;
+  grad["velocity"] = grad_velocity;
+  grad["quaternion"] = grad_quaternion;
+  grad["to"] = grad_to;
+  grad["tf"] = grad_tf;
+
+  return grad;
+}
+
+py::dict dynamics_quaternion_rh_gradient(
+  vec4d quat, vec3d u, double unit_u,
+  double to, double tf, double unit_time, double dx
+) {
+
+  vec4d f_c = dynamics_quaternion(quat, u, unit_u);
+  
+  // quaternion
+  matXd grad_quaternion = matXd::Zero(4, 4);
+  for (int k = 0; k < 4; k++) {
+    quat(k) += dx;
+    vec4d f_p_quat = dynamics_quaternion(
+      quat, u, unit_u
+    );
+    quat(k) -= dx;
+    grad_quaternion.col(k) = -(f_p_quat - f_c) / dx * (tf - to) * unit_time / 2.0;
+  }
+
+  // u (angular velocity)
+  matXd grad_u = matXd::Zero(4, 3);
+  for (int k = 0; k < 3; k++) {
+    u(k) += dx;
+    vec4d f_p_u = dynamics_quaternion(quat, u, unit_u);
+    u(k) -= dx;
+    grad_u.col(k) = -(f_p_u - f_c) / dx * (tf - to) * unit_time / 2.0;
+  }
+
+  //to, tf
+  vec4d grad_to = f_c * unit_time / 2.0;
+  vec4d grad_tf = -grad_to;
+
+  py::dict grad;
+  grad["quaternion"] = grad_quaternion;
+  grad["u"] = grad_u;
+  grad["to"] = grad_to;
+  grad["tf"] = grad_tf;
+
+  return grad;
+}
+
 PYBIND11_MODULE(dynamics_c, m) {
-  m.def("dynamics_velocity", &dynamics_velocity,
-        "velocity with aerodynamic forces");
   m.def("dynamics_velocity_array", &dynamics_velocity_array,
         "velocity with aerodynamic forces (array)");
-  m.def("dynamics_quaternion", &dynamics_quaternion, "quaternion dynamics");
   m.def("dynamics_quaternion_array", &dynamics_quaternion_array,
         "quaternion dynamics array");
+  m.def("dynamics_velocity_rh_gradient", &dynamics_velocity_rh_gradient,
+        "gradient of equality_dynamics_velocity RHS components");
+  m.def("dynamics_quaternion_rh_gradient", &dynamics_quaternion_rh_gradient,
+        "gradient of equality_dynamics_quaternion RHS components");
 }

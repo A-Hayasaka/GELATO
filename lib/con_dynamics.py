@@ -29,10 +29,10 @@
 from itertools import chain, repeat
 import numpy as np
 from .dynamics_c import (
-    dynamics_velocity,
     dynamics_velocity_array,
-    dynamics_quaternion,
     dynamics_quaternion_array,
+    dynamics_velocity_rh_gradient,
+    dynamics_quaternion_rh_gradient
 )
 
 
@@ -285,134 +285,6 @@ def equality_dynamics_velocity(xdict, pdict, unitdict, condition):
 
 
 @profile
-def dynamics_velocity_rh_gradient(mass, pos, vel, quat, t, param, wind, ca, units, to, tf, unit_t, dx):
-    grad = {}
-    f_c = dynamics_velocity(
-        mass,
-        pos,
-        vel,
-        quat,
-        t,
-        param,
-        wind,
-        ca,
-        units,
-    )
-
-    # mass
-    grad["mass"] = np.zeros(3)
-    mass += dx
-    f_p = dynamics_velocity(
-        mass,
-        pos,
-        vel,
-        quat,
-        t,
-        param,
-        wind,
-        ca,
-        units,
-    )
-    mass -= dx
-    grad["mass"] = -(f_p - f_c) / dx * (tf - to) * unit_t / 2.0
-
-    # position
-    grad["position"] = np.zeros((3, 3))
-    for k in range(3):
-        pos[k] += dx
-        f_p = dynamics_velocity(
-            mass,
-            pos,
-            vel,
-            quat,
-            t,
-            param,
-            wind,
-            ca,
-            units,
-        )
-        pos[k] -= dx
-        grad["position"][:, k] = -(f_p - f_c) / dx * (tf - to) * unit_t / 2.0
-
-    # velocity: changes only affect aerodynamic forces
-    grad["velocity"] = np.zeros((3, 3))
-    if param[2] > 0.0:
-        for k in range(3):
-            vel[k] += dx
-            f_p = dynamics_velocity(
-                mass,
-                pos,
-                vel,
-                quat,
-                t,
-                param,
-                wind,
-                ca,
-                units,
-            )
-            vel[k] -= dx
-            grad["velocity"][:, k] = -(f_p - f_c) / dx * (tf - to) * unit_t / 2.0
-
-    # quaternion
-    grad["quaternion"] = np.zeros((3, 4))
-    for k in range(4):
-        quat[k] += dx
-        f_p = dynamics_velocity(
-            mass,
-            pos,
-            vel,
-            quat,
-            t,
-            param,
-            wind,
-            ca,
-            units,
-        )
-        quat[k] -= dx
-        grad["quaternion"][:, k] = -(f_p - f_c) / dx * (tf - to) * unit_t / 2.0
-
-    # t_o, t_f: changes only affect aerodynamic forces
-    if param[2] > 0.0:
-        to_p = to + dx
-        t_p1_ = to_p + t / (tf - to) * (tf - to_p)
-        f_p = dynamics_velocity(
-            mass,
-            pos,
-            vel,
-            quat,
-            t_p1_,
-            param,
-            wind,
-            ca,
-            units,
-        )
-        grad["to"] = (
-            -(f_p * (tf - to_p) - f_c * (tf - to)).ravel() / dx * unit_t / 2.0
-        )
-        tf_p = tf + dx
-        t_p2_ = to + t / (tf - to) * (tf_p - to)
-        f_p = dynamics_velocity(
-            mass,
-            pos,
-            vel,
-            quat,
-            t_p2_,
-            param,
-            wind,
-            ca,
-            units,
-        )
-        grad["tf"] = (
-            -(f_p * (tf_p - to) - f_c * (tf - to)).ravel() / dx * unit_t / 2.0
-        )
-    else:
-        grad["to"] = f_c * unit_t / 2.0
-        grad["tf"] = -grad["to"]
-
-    return grad
-
-
-@profile
 def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
     """Jacobian of equality_dynamics_velocity."""
 
@@ -571,34 +443,6 @@ def equality_dynamics_quaternion(xdict, pdict, unitdict, condition):
 
     return np.concatenate(con, axis=None)
 
-@profile
-def dynamics_quaternion_rh_gradient(quat, u, unit_u, to, tf, unit_t, dx):
-    grad = {}
-    f_c = dynamics_quaternion(quat, u, unit_u)
-
-    # quaternion
-    grad["quaternion"] = np.zeros((4, 4))
-    for k in range(4):
-        quat[k] += dx
-        f_p = dynamics_quaternion(quat, u, unit_u)
-        quat[k] -= dx
-        rh_quat = -(f_p - f_c) / dx * (tf - to) * unit_t / 2.0
-        grad["quaternion"][:, k] = rh_quat
-
-    # u (angular velocity)
-    grad["u"] = np.zeros((4, 3))
-    for k in range(3):
-        u[k] += dx
-        f_p = dynamics_quaternion(quat, u, unit_u)
-        u[k] -= dx
-        grad["u"][:, k] = -(f_p - f_c) / dx * (tf - to) * unit_t / 2.0
-
-    # t_o
-    grad["to"] = f_c * unit_t / 2.0  # rh to
-    # t_f
-    grad["tf"] = -grad["to"]  # rh tf
-
-    return grad
 
 @profile
 def equality_jac_dynamics_quaternion(xdict, pdict, unitdict, condition):
