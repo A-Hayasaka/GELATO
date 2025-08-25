@@ -331,12 +331,7 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
         wind = pdict["wind_table"]
         ca = pdict["ca_table"]
 
-        submat_vel = np.zeros(
-            (n * 3, (n + 1) * 3)
-        )  # jac["velocity"][a*3:b*3, (a+i)*3:(b+i+1)*3]
-        submat_vel[::3, ::3] = pdict["ps_params"].D(i)
-        submat_vel[1::3, 1::3] = pdict["ps_params"].D(i)
-        submat_vel[2::3, 2::3] = pdict["ps_params"].D(i)
+        Di = pdict["ps_params"].D(i)
 
         for j in range(n):
             grad = dynamics_velocity_rh_gradient(
@@ -369,15 +364,21 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
             )
             jac["position"]["coo"][2].extend(grad["position"].ravel())
 
-            jac["velocity"]["coo"][0].extend(
-                chain.from_iterable(
-                    repeat(jj, (n + 1) * 3)
-                    for jj in range((ua + j) * 3, (ua + j + 1) * 3)
-                )
-            )
-            jac["velocity"]["coo"][1].extend(list(range(xa * 3, xb * 3)) * 3)
-            submat_vel[j * 3 : j * 3 + 3, (j + 1) * 3 : (j + 2) * 3] += grad["velocity"]
-            jac["velocity"]["coo"][2].extend(submat_vel[j * 3 : (j + 1) * 3].ravel())
+            for jcol in range(n + 1):
+                if jcol == j + 1:
+                    submat_vel = np.eye(3) * Di[j, jcol] + grad["velocity"]
+                    jac["velocity"]["coo"][0].extend(
+                        chain.from_iterable(
+                            repeat(jj, 3)
+                            for jj in range((ua + j) * 3, (ua + j + 1) * 3)
+                        )
+                    )
+                    jac["velocity"]["coo"][1].extend(list(range((xa + jcol) * 3, (xa + jcol + 1) * 3)) * 3)
+                    jac["velocity"]["coo"][2].extend(submat_vel.ravel())
+                else:
+                    jac["velocity"]["coo"][0].extend(range((ua + j) * 3, (ua + j + 1) * 3))
+                    jac["velocity"]["coo"][1].extend(range((xa + jcol) * 3, (xa + jcol + 1) * 3))
+                    jac["velocity"]["coo"][2].extend([Di[j, jcol]] * 3)
 
             jac["quaternion"]["coo"][0].extend(
                 chain.from_iterable(
@@ -480,13 +481,7 @@ def equality_jac_dynamics_quaternion(xdict, pdict, unitdict, condition):
             jac["quaternion"]["coo"][2].extend([1.0] * (4 * n))
 
         else:
-            submat_quat = np.zeros(
-                (n * 4, (n + 1) * 4)
-            )  # jac["quaternion"][a*4:b*4, (a+i)*4:(b+i+1)*4]
-            submat_quat[::4, ::4] = pdict["ps_params"].D(i)
-            submat_quat[1::4, 1::4] = pdict["ps_params"].D(i)
-            submat_quat[2::4, 2::4] = pdict["ps_params"].D(i)
-            submat_quat[3::4, 3::4] = pdict["ps_params"].D(i)
+            Di = pdict["ps_params"].D(i)
 
             for j in range(n):
                 grad = dynamics_quaternion_rh_gradient(
@@ -499,17 +494,22 @@ def equality_jac_dynamics_quaternion(xdict, pdict, unitdict, condition):
                     dx
                 )
 
-                jac["quaternion"]["coo"][0].extend(
-                    chain.from_iterable(
-                        repeat(jj, (n + 1) * 4)
-                        for jj in range((ua + j) * 4, (ua + j + 1) * 4)
-                    )
-                )
-                jac["quaternion"]["coo"][1].extend(list(range(xa * 4, xb * 4)) * 4)
-                submat_quat[j * 4 : (j + 1) * 4, (j + 1) * 4 : (j + 2) * 4] += grad["quaternion"]
-                jac["quaternion"]["coo"][2].extend(
-                    submat_quat[j * 4 : (j + 1) * 4].ravel()
-                )
+                for jcol in range(n + 1):
+                    if jcol == j + 1:
+                        submat_quat = np.eye(4) * Di[j, jcol] + grad["quaternion"]
+                        jac["quaternion"]["coo"][0].extend(
+                            chain.from_iterable(
+                                repeat(jj, 4)
+                                for jj in range((ua + j) * 4, (ua + j + 1) * 4)
+                            )
+                        )
+                        jac["quaternion"]["coo"][1].extend(list(range((xa + jcol) * 4, (xa + jcol + 1) * 4)) * 4)
+                        jac["quaternion"]["coo"][2].extend(submat_quat.ravel())
+                    else:
+                        jac["quaternion"]["coo"][0].extend(range((ua + j) * 4, (ua + j + 1) * 4))
+                        jac["quaternion"]["coo"][1].extend(range((xa + jcol) * 4, (xa + jcol + 1) * 4))
+                        jac["quaternion"]["coo"][2].extend([Di[j, jcol]] * 4)
+
 
                 jac["u"]["coo"][0].extend(
                     chain.from_iterable(
