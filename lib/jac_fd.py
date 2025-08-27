@@ -25,8 +25,8 @@
 
 import numpy as np
 
-
-def jac_fd(con, xdict, pdict, unitdict, condition):
+@profile
+def jac_fd(con, xdict, pdict, unitdict, condition, sparsity="ALL"):
     """
     Calculate jacobian by finite-difference method(forward difference).
 
@@ -38,6 +38,7 @@ def jac_fd(con, xdict, pdict, unitdict, condition):
         pdict : parameter arg for con
         unitdict : unit arg for con
         conditiondict : condition arg for con
+        sparsity(dict) : sparsity pattern for jacobian (optional)
 
     Returns:
         jac(dict(ndarray)) : dict of jacobian matrix
@@ -51,12 +52,45 @@ def jac_fd(con, xdict, pdict, unitdict, condition):
         nRows = len(g_base)
     else:
         nRows = 1
+
+    @profile
+    def subroutine(key, i):
+        xdict[key][i] += dx
+        g_p = con(xdict, pdict, unitdict, condition)
+        xdict[key][i] -= dx
+        print(i, g_p - g_base)
+        if nRows == 1:
+            jac[key]["coo"][0].append(0)
+            jac[key]["coo"][1].append(i)
+            jac[key]["coo"][2].append((g_p - g_base) / dx)
+        else:
+            jac[key]["coo"][0].extend(range(nRows))
+            jac[key]["coo"][1].extend([i] * nRows)
+            jac[key]["coo"][2].extend((g_p - g_base) / dx)
+
     for key, val in xdict.items():
-        jac[key] = np.zeros((nRows, val.size))
-        for i in range(val.size):
-            xdict[key][i] += dx
-            g_p = con(xdict, pdict, unitdict, condition)
-            jac[key][:, i] = (g_p - g_base) / dx
-            xdict[key][i] -= dx
+        jac[key] = {
+            "coo": [[], [], []],
+            "shape": (nRows, val.size)
+        }
+        if sparsity == "ALL":
+            for i in range(val.size):
+                subroutine(key, i)
+
+        elif key in sparsity:
+            if key == "t":
+                for i in range(val.size):
+                    subroutine(key, i)
+            else:
+                for event_index in range(pdict["ps_params"].num_sections()):
+                    xa = pdict["ps_params"].index_start_x(event_index)
+                    xb = pdict["ps_params"].index_end_x(event_index)
+                    print(event_index, xa, xb)
+                    for i in range(xa * 3, xb * 3):
+                        subroutine(key, i)
+
+        jac[key]["coo"][0] = np.array(jac[key]["coo"][0], dtype="i4")
+        jac[key]["coo"][1] = np.array(jac[key]["coo"][1], dtype="i4")
+        jac[key]["coo"][2] = np.array(jac[key]["coo"][2], dtype="f8")
 
     return jac

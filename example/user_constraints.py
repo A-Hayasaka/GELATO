@@ -114,6 +114,27 @@ def get_values_section(xdict, pdict, unitdict, section_name, key):
 
     return out
 
+def equality_user_sparsity():
+
+    """
+    set sparsity patterns for the equality constraints.
+    the return value should be a dictionary with variable names as keys and their sparsity patterns as values.
+    list of non-zero patterns for each section:
+    - "initial": only initial
+    - "all": all
+
+    Returns:
+        dict: sparsity patterns for the equality constraints
+    """
+
+    return {
+        "position": {
+            "IIP_END": "initial"
+        },
+        "velocity": {
+            "IIP_END": "initial"
+        }
+    }
 
 def equality_user(xdict, pdict, unitdict, condition):
     """
@@ -136,6 +157,15 @@ def equality_user(xdict, pdict, unitdict, condition):
 
     return ha
 
+def inequality_user_sparsity():
+    """
+    set sparsity patterns for the inequality constraints.
+
+    Returns:
+        dict: sparsity patterns for the inequality constraints
+    """
+
+    return {}
 
 def inequality_user(xdict, pdict, unitdict, condition):
     """
