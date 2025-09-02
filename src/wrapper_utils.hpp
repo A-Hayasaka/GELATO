@@ -54,27 +54,33 @@ double interp(double x, vecXd xp, vecXd yp) {
   // xp: x values of the data points
   // yp: y values of the data points
 
-  int n = xp.rows();
+  const int n = xp.size();
 
-  if (x < xp(0)) {
+  if (x <= xp(0)) {
     return yp(0);
   }
 
-  if (x > xp(n - 1)) {
+  if (x >= xp(n - 1)) {
     return yp(n - 1);
   }
 
-  // Find the right place in the table by means of binary search
-  auto lower = std::lower_bound(xp.data(), xp.data() + n, x);
-  int idx = lower - xp.data() - 1;
+  // Find index i such that xp[i] <= x < xp[i+1]
+  auto upper = std::upper_bound(xp.data(), xp.data() + n, x);
+  int idx = static_cast<int>(upper - xp.data()) - 1;
+  if (idx < 0) idx = 0;
+  if (idx >= n - 1) idx = n - 2;
 
-  double x_lower = xp(idx);
-  double x_upper = xp(idx + 1);
+  const double x_lower = xp(idx);
+  const double x_upper = xp(idx + 1);
+  const double y_lower = yp(idx);
+  const double y_upper = yp(idx + 1);
 
-  double y_lower = yp(idx);
-  double y_upper = yp(idx + 1);
-
-  double alpha = (x - x_lower) / (x_upper - x_lower);
+  const double dx = x_upper - x_lower;
+  if (std::abs(dx) < 1e-12) {
+    // Avoid divide-by-zero if xp has duplicate values
+    return y_lower;
+  }
+  const double alpha = (x - x_lower) / dx;
 
   return y_lower + alpha * (y_upper - y_lower);
 }
