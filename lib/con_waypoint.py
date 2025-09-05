@@ -533,6 +533,16 @@ def equality_posLLH(xdict, pdict, unitdict, condition):
             lat_origin = pdict["LaunchCondition"]["lat"]
             downrange = distance_vincenty(lat_origin, lon_origin, posLLH[0], posLLH[1])
 
+            # lat
+            if "lat" in waypoint:
+                if "exact" in waypoint["lat"]:
+                    con.append((posLLH[0] - waypoint["lat"]["exact"]) / 90.0)
+
+            # lon
+            if "lon" in waypoint:
+                if "exact" in waypoint["lon"]:
+                    con.append((posLLH[1] - waypoint["lon"]["exact"]) / 180.0)
+
             # altitude
             if "altitude" in waypoint:
                 if "exact" in waypoint["altitude"]:
@@ -634,6 +644,41 @@ def equality_jac_posLLH(xdict, pdict, unitdict, condition):
             pos_o_ = pos_[xa]
             to_ = t_[i]
 
+
+            # lat
+            if "lat" in waypoint:
+                if "exact" in waypoint["lat"]:
+                    dfdx_LLH = posLLH_gradient(pos_o_, to_, unit_pos, unit_t, dx)
+                    jac["position"]["coo"][0].extend([iRow] * 3)
+                    jac["position"]["coo"][1].extend(range(xa * 3, (xa + 1) * 3))
+                    jac["position"]["coo"][2].extend(
+                        dfdx_LLH["position"][0, :] / 90.0
+                    )
+
+                    jac["t"]["coo"][0].append(iRow)
+                    jac["t"]["coo"][1].append(i)
+                    jac["t"]["coo"][2].append(
+                        dfdx_LLH["t"][0] / 90.0
+                    )
+                    iRow += 1
+
+            # lon
+            if "lon" in waypoint:
+                if "exact" in waypoint["lon"]:
+                    dfdx_LLH = posLLH_gradient(pos_o_, to_, unit_pos, unit_t, dx)
+                    jac["position"]["coo"][0].extend([iRow] * 3)
+                    jac["position"]["coo"][1].extend(range(xa * 3, (xa + 1) * 3))
+                    jac["position"]["coo"][2].extend(
+                        dfdx_LLH["position"][1, :] / 180.0
+                    )
+
+                    jac["t"]["coo"][0].append(iRow)
+                    jac["t"]["coo"][1].append(i)
+                    jac["t"]["coo"][2].append(
+                        dfdx_LLH["t"][1] / 180.0
+                    )
+                    iRow += 1
+
             # altitude
             if "altitude" in waypoint:
                 if "exact" in waypoint["altitude"]:
@@ -707,6 +752,24 @@ def inequality_posLLH(xdict, pdict, unitdict, condition):
             lat_origin = pdict["LaunchCondition"]["lat"]
             downrange = distance_vincenty(lat_origin, lon_origin, posLLH[0], posLLH[1])
 
+            # lat
+            if "lat" in waypoint:
+                # min
+                if "min" in waypoint["lat"]:
+                    con.append((posLLH[0] - waypoint["lat"]["min"]) / 90.0)
+                # max
+                if "max" in waypoint["lat"]:
+                    con.append(-(posLLH[0] - waypoint["lat"]["max"]) / 90.0)
+
+            # lon
+            if "lon" in waypoint:
+                # min
+                if "min" in waypoint["lon"]:
+                    con.append((posLLH[1] - waypoint["lon"]["min"]) / 180.0)
+                # max
+                if "max" in waypoint["lon"]:
+                    con.append(-(posLLH[1] - waypoint["lon"]["max"]) / 180.0)
+
             # altitude
             if "altitude" in waypoint:
                 # min
@@ -767,6 +830,70 @@ def inequality_jac_posLLH(xdict, pdict, unitdict, condition):
             xa = pdict["ps_params"].index_start_x(i)
             pos_o_ = pos_[xa]
             to_ = t_[i]
+
+            # lat
+            if "lat" in waypoint:
+                if "min" in waypoint["lat"]:
+                    dfdx_LLH = posLLH_gradient(pos_o_, to_, unit_pos, unit_t, dx)
+                    jac["position"]["coo"][0].extend([iRow] * 3)
+                    jac["position"]["coo"][1].extend(range(xa * 3, (xa + 1) * 3))
+                    jac["position"]["coo"][2].extend(
+                        dfdx_LLH["position"][0, :] / 90.0
+                    )
+
+                    jac["t"]["coo"][0].append(iRow)
+                    jac["t"]["coo"][1].append(i)
+                    jac["t"]["coo"][2].append(
+                        dfdx_LLH["t"][2] / 90.0
+                    )
+                    iRow += 1
+
+                if "max" in waypoint["lat"]:
+                    dfdx_LLH = posLLH_gradient(pos_o_, to_, unit_pos, unit_t, dx)
+                    jac["position"]["coo"][0].extend([iRow] * 3)
+                    jac["position"]["coo"][1].extend(range(xa * 3, (xa + 1) * 3))
+                    jac["position"]["coo"][2].extend(
+                        -dfdx_LLH["position"][0, :] / 90.0
+                    )
+
+                    jac["t"]["coo"][0].append(iRow)
+                    jac["t"]["coo"][1].append(i)
+                    jac["t"]["coo"][2].append(
+                        -dfdx_LLH["t"][2] / 90.0
+                    )
+                    iRow += 1
+
+            # lon
+            if "lon" in waypoint:
+                if "min" in waypoint["lon"]:
+                    dfdx_LLH = posLLH_gradient(pos_o_, to_, unit_pos, unit_t, dx)
+                    jac["position"]["coo"][0].extend([iRow] * 3)
+                    jac["position"]["coo"][1].extend(range(xa * 3, (xa + 1) * 3))
+                    jac["position"]["coo"][2].extend(
+                        dfdx_LLH["position"][1, :] / 180.0
+                    )
+
+                    jac["t"]["coo"][0].append(iRow)
+                    jac["t"]["coo"][1].append(i)
+                    jac["t"]["coo"][2].append(
+                        dfdx_LLH["t"][1] / 180.0
+                    )
+                    iRow += 1
+
+                if "max" in waypoint["lon"]:
+                    dfdx_LLH = posLLH_gradient(pos_o_, to_, unit_pos, unit_t, dx)
+                    jac["position"]["coo"][0].extend([iRow] * 3)
+                    jac["position"]["coo"][1].extend(range(xa * 3, (xa + 1) * 3))
+                    jac["position"]["coo"][2].extend(
+                        -dfdx_LLH["position"][1, :] / 180.0
+                    )
+
+                    jac["t"]["coo"][0].append(iRow)
+                    jac["t"]["coo"][1].append(i)
+                    jac["t"]["coo"][2].append(
+                        -dfdx_LLH["t"][1] / 180.0
+                    )
+                    iRow += 1
 
             # altitude
             if "altitude" in waypoint:
