@@ -25,8 +25,8 @@
 
 import numpy as np
 
-
-def jac_fd(con, xdict, pdict, unitdict, condition):
+@profile
+def jac_fd(con, xdict, pdict, unitdict, condition, keycol_nonzero="ALL"):
     """
     Calculate jacobian by finite-difference method(forward difference).
 
@@ -38,6 +38,7 @@ def jac_fd(con, xdict, pdict, unitdict, condition):
         pdict : parameter arg for con
         unitdict : unit arg for con
         conditiondict : condition arg for con
+        keycol_nonzero(dict or "ALL") : sparsity pattern of jacobian matrix
 
     Returns:
         jac(dict(ndarray)) : dict of jacobian matrix
@@ -46,17 +47,31 @@ def jac_fd(con, xdict, pdict, unitdict, condition):
 
     jac = {}
     dx = pdict["dx"]
+    num_sections = pdict["num_sections"]
     g_base = con(xdict, pdict, unitdict, condition)
     if hasattr(g_base, "__len__"):
         nRows = len(g_base)
     else:
         nRows = 1
+    jac["mass"] = {"coo": [[], [], []], "shape": (nRows, pdict["M"])}
+    jac["position"] = {"coo": [[], [], []], "shape": (nRows, pdict["M"] * 3)}
+    jac["velocity"] = {"coo": [[], [], []], "shape": (nRows, pdict["M"] * 3)}
+    jac["quaternion"] = {"coo": [[], [], []], "shape": (nRows, pdict["M"] * 4)}
+    jac["u"] = {"coo": [[], [], []], "shape": (nRows, pdict["N"] * 3)}
+    jac["t"] = {"coo": [[], [], []], "shape": (nRows, num_sections + 1)}
+
     for key, val in xdict.items():
-        jac[key] = np.zeros((nRows, val.size))
         for i in range(val.size):
             xdict[key][i] += dx
             g_p = con(xdict, pdict, unitdict, condition)
-            jac[key][:, i] = (g_p - g_base) / dx
+            jac[key]["coo"][0].extend(list(range(nRows)))
+            jac[key]["coo"][1].extend([i] * nRows)
+            jac[key]["coo"][2].extend((g_p - g_base) / dx)
             xdict[key][i] -= dx
+
+    for key in jac.keys():
+        jac[key]["coo"][0] = np.array(jac[key]["coo"][0], dtype=np.int32)
+        jac[key]["coo"][1] = np.array(jac[key]["coo"][1], dtype=np.int32)
+        jac[key]["coo"][2] = np.array(jac[key]["coo"][2], dtype=np.float64)
 
     return jac

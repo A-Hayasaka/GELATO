@@ -26,17 +26,59 @@
 # constraints_u.py
 # constraints about user conditions
 
-from user_constraints import equality_user, inequality_user
+import user_constraints as uc
 from .jac_fd import jac_fd
+
+
+def equality_user(xdict, pdict, unitdict, condition):
+    """User-defined equality constraint."""
+    if not hasattr(uc, "equality_user"):
+        return None
+    else:
+        return uc.equality_user(xdict, pdict, unitdict, condition)
+
+
+def equality_sparsity_user(pdict, condition):
+    """Sparsity pattern of user-defined equality constraint."""
+    if not hasattr(uc, "equality_sparsity_user"):
+        return "ALL"
+    else:
+        return uc.equality_sparsity_user(pdict, condition)
 
 
 def equality_jac_user(xdict, pdict, unitdict, condition):
     """Jacobian of user-defined equality constraint."""
-    if equality_user(xdict, pdict, unitdict, condition) is not None:
-        return jac_fd(equality_user, xdict, pdict, unitdict, condition)
+    if not hasattr(uc, "equality_user"):
+        return None
+    elif uc.equality_user(xdict, pdict, unitdict, condition) is not None:
+        keycol_nonzero = equality_sparsity_user(pdict, condition)
+        return jac_fd(
+            uc.equality_user, xdict, pdict, unitdict, condition, keycol_nonzero
+        )
+
+
+def inequality_user(xdict, pdict, unitdict, condition):
+    """User-defined inequality constraint."""
+    if not hasattr(uc, "inequality_user"):
+        return None
+    else:
+        return uc.inequality_user(xdict, pdict, unitdict, condition)
+
+
+def inequality_sparsity_user(pdict, condition):
+    """Sparsity pattern of user-defined inequality constraint."""
+    if not hasattr(uc, "inequality_sparsity_user"):
+        return "ALL"
+    else:
+        return uc.inequality_sparsity_user(pdict, condition)
 
 
 def inequality_jac_user(xdict, pdict, unitdict, condition):
     """Jacobian of user-defined inequality constraint."""
-    if inequality_user(xdict, pdict, unitdict, condition) is not None:
-        return jac_fd(inequality_user, xdict, pdict, unitdict, condition)
+    if not hasattr(uc, "inequality_user"):
+        return None
+    if uc.inequality_user(xdict, pdict, unitdict, condition) is not None:
+        keycol_nonzero = equality_sparsity_user(pdict, condition)
+        return jac_fd(
+            uc.inequality_user, xdict, pdict, unitdict, condition, keycol_nonzero
+        )

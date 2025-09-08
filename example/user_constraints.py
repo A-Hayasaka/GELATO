@@ -25,94 +25,7 @@
 
 import numpy as np
 from lib.coordinate_c import orbital_elements
-
-def get_value(xdict, pdict, unitdict, section_name, key):
-    """
-    get vector of states, contols and time at the specified knot.
-
-    Args:
-        xdict(dict) : variables(dimensionless)
-        pdict(dict) : parameters
-        unitdict(dict) : unit of the variables
-        section_name(str) : section name
-        key(str) : "mass", "position", "velocity", "quaternion", "u" or "t"
-
-    Returns:
-        out(float or ndarray) : array of variables
-    """
-
-    # read index number
-    index = pdict["event_index"][section_name]
-
-    if key == "t":
-        out = xdict[key][index] * unitdict[key]
-
-    else:
-        # sample variables in specified section
-
-        a = pdict["ps_params"].index_start_u(index)
-
-        if key == "u":
-            out = xdict[key][a * 3 : (a + 1) * 3] * unitdict[key]
-        else:
-            a2 = a + index
-            if key in ["position", "velocity"]:
-                out = xdict[key][a2 * 3 : (a2 + 1) * 3] * unitdict[key]
-            elif key == "mass":
-                out = xdict[key][a2] * unitdict[key]
-            elif key == "quaternion":
-                out = xdict[key][a2 * 4 : (a2 + 1) * 4]
-
-    return out
-
-
-def get_values_section(xdict, pdict, unitdict, section_name, key):
-    """
-    get vector of states, contols and time in the specified section.
-
-    Args:
-        xdict(dict) : variables(dimensionless)
-        pdict(dict) : parameters
-        unitdict(dict) : unit of the variables
-        section_name(str) : section name
-        key(str) : "mass", "position", "velocity", "quaternion", "u" or "t"
-
-    Returns:
-        out(ndarray) : array of variables
-    """
-
-    # read index number
-    index = [i for i, value in enumerate(pdict["params"]) if value["name"] == section_name][0]
-    n = pdict["ps_params"][index]["nodes"]
-
-    if key == "t":
-        t = xdict[key] * unitdict[key]
-        to = t[index]
-        tf = t[index + 1]
-        t_nodes = np.zeros(n + 1)
-        t_nodes[0] = to
-        t_nodes[1:] = pdict["ps_params"][index]["tau"] * (tf - to) / 2.0 + (tf + to) / 2.0
-        out = t_nodes  # time array (includes initial point)
-
-    else:
-        if key == "mass":
-            val_ = xdict[key] * unitdict[key]
-        elif key == "quaternion":
-            val_ = xdict[key].reshape(-1, 4)
-        else:  # position, velocity or u
-            val_ = xdict[key].reshape(-1, 3) * unitdict[key]
-
-        # sample variables in specified section
-
-        a = pdict["ps_params"][index]["index_start"]
-        a2 = a + index
-
-        if key == "u":
-            out = val_[a : a + n]
-        else:
-            out = val_[a2 : a2 + n + 1]
-
-    return out
+from lib.usercon_tools import get_value
 
 
 def equality_user(xdict, pdict, unitdict, condition):
@@ -137,6 +50,17 @@ def equality_user(xdict, pdict, unitdict, condition):
     return ha
 
 
+def equality_sparsity_user(pdict, condition):
+    """
+    set sparsity pattern of equality_user function.
+    """
+
+    return {
+        "position": {"IIP_END": [0, 1, 2]},
+        "velocity": {"IIP_END": [0, 1, 2]},
+    }
+
+
 def inequality_user(xdict, pdict, unitdict, condition):
     """
     set additional inequality constraints.
@@ -147,6 +71,14 @@ def inequality_user(xdict, pdict, unitdict, condition):
 
     the type of return value is float64 or numpy.ndarray(float64)
 
+    """
+
+    return None
+
+
+def inequality_sparsity_user(pdict, condition):
+    """
+    set sparsity pattern of inequality_user function.
     """
 
     return None

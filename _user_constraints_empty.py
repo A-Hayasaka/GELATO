@@ -23,6 +23,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+import lib.usercon_tools as uct
 
 def equality_user(xdict, pdict, unitdict, condition):
 
