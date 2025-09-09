@@ -24,6 +24,7 @@
 #
 
 import numpy as np
+from .usercon_tools import get_index_event
 
 @profile
 def jac_fd(con, xdict, pdict, unitdict, condition, keycol_nonzero="ALL"):
@@ -44,7 +45,6 @@ def jac_fd(con, xdict, pdict, unitdict, condition, keycol_nonzero="ALL"):
         jac(dict(ndarray)) : dict of jacobian matrix
 
     """
-
     jac = {}
     dx = pdict["dx"]
     num_sections = pdict["num_sections"]
@@ -60,18 +60,34 @@ def jac_fd(con, xdict, pdict, unitdict, condition, keycol_nonzero="ALL"):
     jac["u"] = {"coo": [[], [], []], "shape": (nRows, pdict["N"] * 3)}
     jac["t"] = {"coo": [[], [], []], "shape": (nRows, num_sections + 1)}
 
-    for key, val in xdict.items():
-        for i in range(val.size):
-            xdict[key][i] += dx
-            g_p = con(xdict, pdict, unitdict, condition)
-            jac[key]["coo"][0].extend(list(range(nRows)))
-            jac[key]["coo"][1].extend([i] * nRows)
-            jac[key]["coo"][2].extend((g_p - g_base) / dx)
-            xdict[key][i] -= dx
+    for var_name, var_value in xdict.items():
+        if keycol_nonzero == "ALL":
+            for i in range(len(var_value)):
+                var_value[i] += dx
+                g_p = con(xdict, pdict, unitdict, condition)
+                jac[var_name]["coo"][0].extend(list(range(nRows)))
+                jac[var_name]["coo"][1].extend([i] * nRows)
+                jac[var_name]["coo"][2].extend((g_p - g_base) / dx)
+                var_value[i] -= dx
+        elif var_name in keycol_nonzero.keys():
+            for event_name, col_list in keycol_nonzero[var_name].items():
+                idx_start, idx_end = get_index_event(pdict, event_name, var_name)
+                for i_rel in col_list:
+                    i = idx_start + i_rel
+                    var_value[i] += dx
+                    g_p = con(xdict, pdict, unitdict, condition)
+                    jac[var_name]["coo"][0].extend(list(range(nRows)))
+                    jac[var_name]["coo"][1].extend([i] * nRows)
+                    # extend if iterable, else append
+                    if hasattr(g_p, "__len__"):
+                        jac[var_name]["coo"][2].extend((g_p - g_base) / dx)
+                    else:
+                        jac[var_name]["coo"][2].append((g_p - g_base) / dx)
+                    var_value[i] -= dx
 
-    for key in jac.keys():
-        jac[key]["coo"][0] = np.array(jac[key]["coo"][0], dtype=np.int32)
-        jac[key]["coo"][1] = np.array(jac[key]["coo"][1], dtype=np.int32)
-        jac[key]["coo"][2] = np.array(jac[key]["coo"][2], dtype=np.float64)
+    for var_name in jac.keys():
+        jac[var_name]["coo"][0] = np.array(jac[var_name]["coo"][0], dtype=np.int32)
+        jac[var_name]["coo"][1] = np.array(jac[var_name]["coo"][1], dtype=np.int32)
+        jac[var_name]["coo"][2] = np.array(jac[var_name]["coo"][2], dtype=np.float64)
 
     return jac

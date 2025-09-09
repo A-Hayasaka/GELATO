@@ -78,7 +78,7 @@ def inequality_jac_user(xdict, pdict, unitdict, condition):
     if not hasattr(uc, "inequality_user"):
         return None
     if uc.inequality_user(xdict, pdict, unitdict, condition) is not None:
-        keycol_nonzero = equality_sparsity_user(pdict, condition)
+        keycol_nonzero = inequality_sparsity_user(pdict, condition)
         return jac_fd(
             uc.inequality_user, xdict, pdict, unitdict, condition, keycol_nonzero
         )

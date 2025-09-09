@@ -22,8 +22,51 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
+import numpy as np
 
+@profile
+def get_index_event(pdict, section_name, key):
+    """
+    get index 
 
+    Args:
+        pdict(dict) : parameters
+        section_name(str) : section name
+        key(str) : "mass", "position", "velocity", "quaternion", "u" or "t"
+
+    Returns:
+        out(float or ndarray) : array of variables
+    """
+
+    # read section number
+    section_num = pdict["event_index"][section_name]
+
+    if key == "t":
+        index_start = section_num
+        index_end = section_num + 1
+
+    else:
+        # sample variables in specified section
+
+        ua, ub, xa, xb, _ = pdict["ps_params"].get_index(section_num)
+
+        if key == "u":
+            index_start = ua * 3
+            index_end = ub * 3
+        else:
+            if key in ["position", "velocity"]:
+                index_start = xa * 3
+                index_end = xb * 3
+            elif key == "mass":
+                index_start = xa
+                index_end = xb
+            elif key == "quaternion":
+                index_start = xa * 4
+                index_end = xb * 4
+
+    return index_start, index_end
+
+@profile
 def get_value(xdict, pdict, unitdict, section_name, key):
     """
     get vector of states, contols and time at the specified knot.
@@ -39,27 +82,17 @@ def get_value(xdict, pdict, unitdict, section_name, key):
         out(float or ndarray) : array of variables
     """
 
-    # read index number
-    index = pdict["event_index"][section_name]
+    # index number
+    index_start, _ = get_index_event(pdict, section_name, key)
 
     if key == "t":
-        out = xdict[key][index] * unitdict[key]
+        out = xdict[key][index_start] * unitdict[key]
 
     else:
-        # sample variables in specified section
-
-        a = pdict["ps_params"].index_start_u(index)
-
-        if key == "u":
-            out = xdict[key][a * 3 : (a + 1) * 3] * unitdict[key]
-        else:
-            a2 = a + index
-            if key in ["position", "velocity"]:
-                out = xdict[key][a2 * 3 : (a2 + 1) * 3] * unitdict[key]
-            elif key == "mass":
-                out = xdict[key][a2] * unitdict[key]
-            elif key == "quaternion":
-                out = xdict[key][a2 * 4 : (a2 + 1) * 4]
+        if key == "quaternion":
+            out = xdict[key][index_start : (index_start + 4)] * unitdict[key]
+        else:  # position, velocity or u
+            out = xdict[key][index_start : (index_start + 3)] * unitdict[key]
 
     return out
 
