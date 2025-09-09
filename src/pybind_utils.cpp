@@ -34,6 +34,10 @@ PYBIND11_MODULE(utils_c, m) {
         "Angle of attack in radians");
   m.def("dynamic_pressure_pa", &dynamic_pressure_pa,
         "Dynamic pressure in Pascals");
+  m.def("dynamic_pressure_dimless", &dynamic_pressure_dimless,
+        "Dynamic pressure in dimensionless form");
+  m.def("dynamic_pressure_array_dimless", &dynamic_pressure_array_dimless,
+        "Dynamic pressure in dimensionless form for an array of states");
   m.def("q_alpha_pa_rad", &q_alpha_pa_rad,
         "Dynamic pressure times angle of attack in Pascals * radians");
   m.def("angle_of_attack_all_array_rad", &angle_of_attack_all_array_rad,
@@ -50,6 +54,9 @@ PYBIND11_MODULE(utils_c, m) {
   m.def("q_alpha_array_dimless", &q_alpha_array_dimless,
         "Dynamic pressure times angle of attack in dimensionless form for an "
         "array of states");
+  m.def("dynamic_pressure_gradient_dimless_core",
+        &dynamic_pressure_gradient_dimless_core,
+        "Gradient of dynamic pressure in dimensionless form");
   m.def("q_alpha_gradient_dimless_core", &q_alpha_gradient_dimless_core,
       "Gradient of dynamic pressure times angle of attack in dimensionless form");
   m.def("roll_direction_array", &roll_direction_array,

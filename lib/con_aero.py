@@ -28,33 +28,17 @@
 
 import numpy as np
 from .utils_c import (
-    dynamic_pressure_pa,
     angle_of_attack_all_rad,
-    q_alpha_pa_rad,
-    dynamic_pressure_array_pa,
+    dynamic_pressure_dimless,
+    dynamic_pressure_array_dimless,
+    dynamic_pressure_gradient_dimless_core,
     angle_of_attack_all_array_rad,
-    q_alpha_array_pa_rad,
     q_alpha_dimless,
     q_alpha_array_dimless,
     q_alpha_gradient_dimless_core,
 )
 from .coordinate_c import *
 
-
-def dynamic_pressure_dimless(pos_eci_e, vel_eci_e, t_e, wind, units):
-    """Returns dynamic pressure normalized by its maximum value."""
-    pos_eci = pos_eci_e * units[0]
-    vel_eci = vel_eci_e * units[1]
-    t = t_e * units[2]
-    return dynamic_pressure_pa(pos_eci, vel_eci, t, wind) / units[3]
-
-
-def dynamic_pressure_array_dimless(pos_eci_e, vel_eci_e, t_e, wind, units):
-    """Returns array of dynamic pressure for each state values."""
-    pos_eci = pos_eci_e * units[0]
-    vel_eci = vel_eci_e * units[1]
-    t = t_e * units[2]
-    return dynamic_pressure_array_pa(pos_eci, vel_eci, t, wind) / units[3]
 
 
 def angle_of_attack_all_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
@@ -457,52 +441,23 @@ def inequality_jac_max_alpha(xdict, pdict, unitdict, condition):
 
     return jac
 
-
+@profile
 def dynamic_pressure_gradient_dimless(
-    pos_eci_e, vel_eci_e, to, tf, wind, units, time_nodes, dx, n
+    pos_eci_e, vel_eci_e, to, tf, wind, units, t_nodes, dx, n
 ):
     """Returns gradient of dynamic pressure."""
     ki = range(n)
-    grad = {
-        "position": np.zeros((n, 3)),
-        "velocity": np.zeros((n, 3)),
-        "to": np.zeros(n),
-        "tf": np.zeros(n),
-    }
-
     pos_ki = pos_eci_e[ki]
     vel_ki = vel_eci_e[ki]
-
-    t_nodes = time_nodes(to, tf)
     t_ki = t_nodes[ki]
 
-    f_c = dynamic_pressure_array_dimless(pos_ki, vel_ki, t_ki, wind, units)
+    grad2 = dynamic_pressure_gradient_dimless_core(
+        n, pos_ki, vel_ki, t_ki, wind, units, dx
+    )
 
-    for j in range(3):
-        pos_ki[:, j] += dx
-        f_p = dynamic_pressure_array_dimless(pos_ki, vel_ki, t_ki, wind, units)
-        pos_ki[:, j] -= dx
-        grad["position"][:, j] = (f_p - f_c) / dx
+    return grad2
 
-    for j in range(3):
-        vel_ki[:, j] += dx
-        f_p = dynamic_pressure_array_dimless(pos_ki, vel_ki, t_ki, wind, units)
-        vel_ki[:, j] -= dx
-        grad["velocity"][:, j] = (f_p - f_c) / dx
-
-    to_p = to + dx
-    t_nodes_p1 = time_nodes(to_p, tf)
-    f_p = dynamic_pressure_array_dimless(pos_ki, vel_ki, t_nodes_p1[ki], wind, units)
-    grad["to"] = (f_p - f_c) / dx
-
-    tf_p = tf + dx
-    t_nodes_p2 = time_nodes(to, tf_p)
-    f_p = dynamic_pressure_array_dimless(pos_ki, vel_ki, t_nodes_p2[ki], wind, units)
-    grad["tf"] = (f_p - f_c) / dx
-
-    return grad
-
-
+@profile
 def inequality_jac_max_q(xdict, pdict, unitdict, condition):
     """Jacobian of inequality_max_q."""
 
@@ -554,11 +509,10 @@ def inequality_jac_max_q(xdict, pdict, unitdict, condition):
             elif condition["dynamic_pressure_max"][section_name]["range"] == "initial":
                 nk = 1
 
-            def time_nodes(t1, t2):
-                return pdict["ps_params"].time_nodes(i, t1, t2)
+            t_nodes = pdict["ps_params"].time_nodes(i, to, tf)
 
             dfdx = dynamic_pressure_gradient_dimless(
-                pos_i_, vel_i_, to, tf, wind, units, time_nodes, dx, nk
+                pos_i_, vel_i_, to, tf, wind, units, t_nodes, dx, nk
             )
 
             for j in range(3):
