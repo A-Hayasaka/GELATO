@@ -32,6 +32,13 @@ PYBIND11_MODULE(utils_c, m) {
         "Angle of attack in radians");
   m.def("angle_of_attack_ab_rad", &angle_of_attack_ab_rad,
         "Angle of attack in radians");
+  m.def("angle_of_attack_all_dimless", &angle_of_attack_all_dimless,
+        "Angle of attack in dimensionless form");
+  m.def("angle_of_attack_all_array_dimless", &angle_of_attack_all_array_dimless,
+        "Angle of attack in dimensionless form for an array of states");
+  m.def("angle_of_attack_all_gradient_dimless_core",
+        &angle_of_attack_all_gradient_dimless_core,
+        "Gradient of angle of attack in dimensionless form");
   m.def("dynamic_pressure_pa", &dynamic_pressure_pa,
         "Dynamic pressure in Pascals");
   m.def("dynamic_pressure_dimless", &dynamic_pressure_dimless,

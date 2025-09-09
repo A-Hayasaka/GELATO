@@ -116,6 +116,12 @@ double angle_of_attack_all_rad(vec3d pos_eci, vec3d vel_eci, vec4d quat,
   }
 }
 
+double angle_of_attack_all_dimless(vec3d pos_eci, vec3d vel_eci, vec4d quat,
+                                  double t, matXd wind, vecXd units) {
+  return angle_of_attack_all_rad(pos_eci * units[0], vel_eci * units[1], quat,
+                                 t * units[2], wind) / units[3];
+}
+
 vecXd angle_of_attack_all_array_rad(matXd pos_eci, matXd vel_eci, matXd quat,
                                     vecXd t, matXd wind) {
   int n = pos_eci.rows();
@@ -124,6 +130,20 @@ vecXd angle_of_attack_all_array_rad(matXd pos_eci, matXd vel_eci, matXd quat,
   for (int i = 0; i < n; i++) {
     alpha(i) = angle_of_attack_all_rad(pos_eci.row(i), vel_eci.row(i),
                                        quat.row(i), t(i), wind);
+  }
+
+  return alpha;
+}
+
+vecXd angle_of_attack_all_array_dimless(matXd pos_eci_e, matXd vel_eci_e,
+                                       matXd quat, vecXd t_e, matXd wind,
+                                       vecXd units) {
+  int n = pos_eci_e.rows();
+  vecXd alpha(n);
+
+  for (int i = 0; i < n; i++) {
+    alpha(i) = angle_of_attack_all_dimless(pos_eci_e.row(i), vel_eci_e.row(i),
+                                          quat.row(i), t_e(i), wind, units);
   }
 
   return alpha;
@@ -250,6 +270,83 @@ vecXd q_alpha_array_dimless(matXd pos_eci_e, matXd vel_eci_e, matXd quat,
 
   return q_alpha;
 }
+
+py::dict angle_of_attack_all_gradient_dimless_core(int n, matXd pos_ki, matXd vel_ki,
+                                       matXd quat_ki, vecXd t_ki, matXd wind,
+                                       vecXd units, double dx) {
+  matXd grad_pos = Eigen::MatrixXd::Zero(n, 3);
+  matXd grad_vel = Eigen::MatrixXd::Zero(n, 3);
+  matXd grad_quat = Eigen::MatrixXd::Zero(n, 4);
+  vecXd grad_to = Eigen::VectorXd::Zero(n);
+  vecXd grad_tf = Eigen::VectorXd::Zero(n);
+
+  double to = t_ki(0);
+  double tf = 0.0;
+  if (n > 1)
+    tf = t_ki(t_ki.size() - 1);
+
+  double f_c, t_po, t_pf;
+
+  for (int i = 0; i < n; i++) {
+    f_c = angle_of_attack_all_dimless(pos_ki.row(i), vel_ki.row(i), quat_ki.row(i), t_ki(i),
+                          wind, units);
+
+    for (int j = 0; j < 3; j++) {
+      pos_ki(i, j) += dx;
+      grad_pos(i, j) = (angle_of_attack_all_dimless(pos_ki.row(i), vel_ki.row(i),
+                                        quat_ki.row(i), t_ki(i), wind, units) -
+                        f_c) /
+                       dx;
+      pos_ki(i, j) -= dx;
+    }
+
+    for (int j = 0; j < 3; j++) {
+      vel_ki(i, j) += dx;
+      grad_vel(i, j) = (angle_of_attack_all_dimless(pos_ki.row(i), vel_ki.row(i),
+                                        quat_ki.row(i), t_ki(i), wind, units) -
+                        f_c) /
+                       dx;
+      vel_ki(i, j) -= dx;
+    }
+
+    for (int j = 0; j < 4; j++) {
+      quat_ki(i, j) += dx;
+      grad_quat(i, j) = (angle_of_attack_all_dimless(pos_ki.row(i), vel_ki.row(i),
+                                         quat_ki.row(i), t_ki(i), wind, units) -
+                         f_c) /
+                        dx;
+      quat_ki(i, j) -= dx;
+    }
+
+    if (n > 1) {
+      t_po = tf - (tf - (to + dx)) / (tf - to) * (tf - t_ki(i));
+      grad_to(i) = (angle_of_attack_all_dimless(pos_ki.row(i), vel_ki.row(i), quat_ki.row(i),
+                                    t_po, wind, units) -
+                    f_c) /
+                  dx;
+
+      t_pf = to + ((tf + dx) - to) / (tf - to) * (t_ki(i) - to);
+      grad_tf(i) = (angle_of_attack_all_dimless(pos_ki.row(i), vel_ki.row(i), quat_ki.row(i),
+                                    t_pf, wind, units) -
+                    f_c) /
+                  dx;
+    } else {
+      grad_to(i) = (angle_of_attack_all_dimless(pos_ki.row(i), vel_ki.row(i), quat_ki.row(i),
+                                    to + dx, wind, units) -
+                    f_c) /
+                  dx;
+    }
+  }
+
+  py::dict grad;
+  grad["position"] = grad_pos;
+  grad["velocity"] = grad_vel;
+  grad["quaternion"] = grad_quat;
+  grad["to"] = grad_to;
+  grad["tf"] = grad_tf;
+  return grad;
+}
+
 
 py::dict dynamic_pressure_gradient_dimless_core(int n, matXd pos_ki, matXd vel_ki,
                                        vecXd t_ki, matXd wind,
