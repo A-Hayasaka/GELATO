@@ -66,7 +66,6 @@ def inequality_max_alpha(xdict, pdict, unitdict, condition):
 
         # angle of attack
         if section_name in condition["AOA_max"]:
-
             ua, ub, xa, xb, n = pdict["ps_params"].get_index(i)
             pos_i_ = pos_[xa:xb]
             vel_i_ = vel_[xa:xb]
@@ -122,7 +121,6 @@ def inequality_max_q(xdict, pdict, unitdict, condition):
         section_name = pdict["params"][i]["name"]
         # max-Q
         if section_name in condition["dynamic_pressure_max"]:
-
             ua, ub, xa, xb, n = pdict["ps_params"].get_index(i)
             pos_i_ = pos_[xa:xb]
             vel_i_ = vel_[xa:xb]
@@ -171,11 +169,9 @@ def inequality_max_qalpha(xdict, pdict, unitdict, condition):
     wind = pdict["wind_table"]
 
     for i in range(num_sections - 1):
-
         section_name = pdict["params"][i]["name"]
         # max-Qalpha
         if section_name in condition["Q_alpha_max"]:
-
             ua, ub, xa, xb, n = pdict["ps_params"].get_index(i)
             pos_i_ = pos_[xa:xb]
             vel_i_ = vel_[xa:xb]
@@ -210,11 +206,9 @@ def inequality_length_max_alpha(xdict, pdict, unitdict, condition):
     num_sections = pdict["num_sections"]
 
     for i in range(num_sections - 1):
-
         section_name = pdict["params"][i]["name"]
         # max-Qalpha
         if section_name in condition["AOA_max"]:
-
             if condition["AOA_max"][section_name]["range"] == "all":
                 res += pdict["ps_params"].nodes(i) + 1
             elif condition["AOA_max"][section_name]["range"] == "initial":
@@ -230,11 +224,9 @@ def inequality_length_max_q(xdict, pdict, unitdict, condition):
     num_sections = pdict["num_sections"]
 
     for i in range(num_sections - 1):
-
         section_name = pdict["params"][i]["name"]
         # max-Qalpha
         if section_name in condition["dynamic_pressure_max"]:
-
             if condition["dynamic_pressure_max"][section_name]["range"] == "all":
                 res += pdict["ps_params"].nodes(i) + 1
             elif condition["dynamic_pressure_max"][section_name]["range"] == "initial":
@@ -250,11 +242,9 @@ def inequality_length_max_qalpha(xdict, pdict, unitdict, condition):
     num_sections = pdict["num_sections"]
 
     for i in range(num_sections - 1):
-
         section_name = pdict["params"][i]["name"]
         # max-Qalpha
         if section_name in condition["Q_alpha_max"]:
-
             if condition["Q_alpha_max"][section_name]["range"] == "all":
                 res += pdict["ps_params"].nodes(i) + 1
             elif condition["Q_alpha_max"][section_name]["range"] == "initial":
@@ -264,31 +254,51 @@ def inequality_length_max_qalpha(xdict, pdict, unitdict, condition):
 
 
 def angle_of_attack_all_gradient_dimless(
-    pos_eci_e, vel_eci_e, quat, to, tf, wind, units, time_nodes, dx, n
+    pos_eci_e, vel_eci_e, quat, to, tf, wind, units, t_nodes, dx, n
 ):
     """Returns gradient of Q-alpha."""
     ki = range(n)
-    grad = {
-        "position": np.zeros((n, 3)),
-        "velocity": np.zeros((n, 3)),
-        "quaternion": np.zeros((n, 4)),
-        "to": np.zeros(n),
-        "tf": np.zeros(n),
-    }
-
     pos_ki = pos_eci_e[ki]
     vel_ki = vel_eci_e[ki]
     quat_ki = quat[ki]
-
-    t_nodes = time_nodes(to, tf)
-    t_ki = t_nodes[ki]
-
     t_ki = t_nodes[ki]
 
     grad2 = angle_of_attack_all_gradient_dimless_core(
         n, pos_ki, vel_ki, quat_ki, t_ki, wind, units, dx
     )
-    
+
+    return grad2
+
+
+@profile
+def dynamic_pressure_gradient_dimless(
+    pos_eci_e, vel_eci_e, to, tf, wind, units, t_nodes, dx, n
+):
+    """Returns gradient of dynamic pressure."""
+    ki = range(n)
+    pos_ki = pos_eci_e[ki]
+    vel_ki = vel_eci_e[ki]
+    t_ki = t_nodes[ki]
+
+    grad2 = dynamic_pressure_gradient_dimless_core(
+        n, pos_ki, vel_ki, t_ki, wind, units, dx
+    )
+
+    return grad2
+
+
+@profile
+def q_alpha_gradient_dimless(pos_eci_e, vel_eci_e, quat, wind, units, t_nodes, dx, n):
+    """Returns gradient of Q-alpha."""
+    ki = range(n)
+    pos_ki = pos_eci_e[ki]
+    vel_ki = vel_eci_e[ki]
+    quat_ki = quat[ki]
+    t_ki = t_nodes[ki]
+
+    grad2 = q_alpha_gradient_dimless_core(
+        n, pos_ki, vel_ki, quat_ki, t_ki, wind, units, dx
+    )
     return grad2
 
 
@@ -325,7 +335,6 @@ def inequality_jac_max_alpha(xdict, pdict, unitdict, condition):
     iRow = 0
 
     for i in range(num_sections - 1):
-
         section_name = pdict["params"][i]["name"]
 
         # angle of attack
@@ -346,11 +355,10 @@ def inequality_jac_max_alpha(xdict, pdict, unitdict, condition):
             elif condition["AOA_max"][section_name]["range"] == "initial":
                 nk = 1
 
-            def time_nodes(t1, t2):
-                return pdict["ps_params"].time_nodes(i, t1, t2)
+            t_nodes = pdict["ps_params"].time_nodes(i, to, tf)
 
             dfdx = angle_of_attack_all_gradient_dimless(
-                pos_i_, vel_i_, quat_i_, to, tf, wind, units, time_nodes, dx, nk
+                pos_i_, vel_i_, quat_i_, to, tf, wind, units, t_nodes, dx, nk
             )
 
             for j in range(3):
@@ -391,21 +399,6 @@ def inequality_jac_max_alpha(xdict, pdict, unitdict, condition):
 
     return jac
 
-@profile
-def dynamic_pressure_gradient_dimless(
-    pos_eci_e, vel_eci_e, to, tf, wind, units, t_nodes, dx, n
-):
-    """Returns gradient of dynamic pressure."""
-    ki = range(n)
-    pos_ki = pos_eci_e[ki]
-    vel_ki = vel_eci_e[ki]
-    t_ki = t_nodes[ki]
-
-    grad2 = dynamic_pressure_gradient_dimless_core(
-        n, pos_ki, vel_ki, t_ki, wind, units, dx
-    )
-
-    return grad2
 
 @profile
 def inequality_jac_max_q(xdict, pdict, unitdict, condition):
@@ -439,7 +432,6 @@ def inequality_jac_max_q(xdict, pdict, unitdict, condition):
     iRow = 0
 
     for i in range(num_sections - 1):
-
         section_name = pdict["params"][i]["name"]
 
         # angle of attack
@@ -498,24 +490,6 @@ def inequality_jac_max_q(xdict, pdict, unitdict, condition):
 
 
 @profile
-def q_alpha_gradient_dimless(
-    pos_eci_e, vel_eci_e, quat, wind, units, t_nodes, dx, n
-):
-    """Returns gradient of Q-alpha."""
-    ki = range(n)
-
-    pos_ki = pos_eci_e[ki]
-    vel_ki = vel_eci_e[ki]
-    quat_ki = quat[ki]
-
-    t_ki = t_nodes[ki]
-
-    grad2 = q_alpha_gradient_dimless_core(
-        n, pos_ki, vel_ki, quat_ki, t_ki, wind, units, dx
-    )
-    return grad2
-
-@profile
 def inequality_jac_max_qalpha(xdict, pdict, unitdict, condition):
     """Jacobian of inequality_max_qalpha."""
 
@@ -548,7 +522,6 @@ def inequality_jac_max_qalpha(xdict, pdict, unitdict, condition):
     iRow = 0
 
     for i in range(num_sections - 1):
-
         section_name = pdict["params"][i]["name"]
 
         # angle of attack
