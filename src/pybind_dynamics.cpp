@@ -91,25 +91,33 @@ matXd dynamics_velocity_array(vecXd mass_e, matXd pos_eci_e, matXd vel_eci_e,
 }
 
 vec4d dynamics_quaternion(vec4d quat_eci2body, vec3d u_e, double unit_u) {
-  vec3d u = u_e * unit_u;
 
-  vec4d omega_rps_body = vec4d(0.0, u(0), u(1), u(2));
-  omega_rps_body = omega_rps_body * M_PI / 180.0;
-  vec4d d_quat = 0.5 * quatmult(quat_eci2body, omega_rps_body);
+  vec3d omega_rps_body = u_e * unit_u * M_PI / 180.0;
+
+  vec4d d_quat = vec4d::Zero();
+  d_quat[0] = 0.5 * (-quat_eci2body[1] * omega_rps_body[0] -
+                      quat_eci2body[2] * omega_rps_body[1] -
+                      quat_eci2body[3] * omega_rps_body[2]);
+  d_quat[1] = 0.5 * ( quat_eci2body[0] * omega_rps_body[0] -
+                      quat_eci2body[3] * omega_rps_body[1] +
+                      quat_eci2body[2] * omega_rps_body[2]);
+  d_quat[2] = 0.5 * ( quat_eci2body[3] * omega_rps_body[0] +
+                      quat_eci2body[0] * omega_rps_body[1] -
+                      quat_eci2body[1] * omega_rps_body[2]);
+  d_quat[3] = 0.5 * (-quat_eci2body[2] * omega_rps_body[0] +
+                      quat_eci2body[1] * omega_rps_body[1] +
+                      quat_eci2body[0] * omega_rps_body[2]);
 
   return d_quat;
 }
 
 
 matXd dynamics_quaternion_array(matXd quat_eci2body, matXd u_e, double unit_u) {
-  matXd u = u_e * unit_u;
+
   matXd d_quat = matXd::Zero(quat_eci2body.rows(), 4);
 
   for (int i = 0; i < quat_eci2body.rows(); i++) {
-    vec4d omega_rps_body = vec4d(0.0, u(i, 0), u(i, 1), u(i, 2));
-    omega_rps_body = omega_rps_body * M_PI / 180.0;
-    vec4d d_quat_i = 0.5 * quatmult(quat_eci2body.row(i), omega_rps_body);
-    d_quat.row(i) = d_quat_i;
+    d_quat.row(i) = dynamics_quaternion(quat_eci2body.row(i), u_e.row(i), unit_u);
   }
 
   return d_quat;
@@ -209,26 +217,24 @@ py::dict dynamics_quaternion_rh_gradient(
 ) {
 
   vec4d f_c = dynamics_quaternion(quat, u, unit_u);
-  
+
+  vec3d omega_rps_body = u * unit_u * M_PI / 180.0;
+
   // quaternion
   matXd grad_quaternion = matXd::Zero(4, 4);
-  for (int k = 0; k < 4; k++) {
-    quat(k) += dx;
-    vec4d f_p_quat = dynamics_quaternion(
-      quat, u, unit_u
-    );
-    quat(k) -= dx;
-    grad_quaternion.col(k) = -(f_p_quat - f_c) / dx * (tf - to) * unit_time / 2.0;
-  }
+  grad_quaternion << 0.0, -0.5 * omega_rps_body[0], -0.5 * omega_rps_body[1], -0.5 * omega_rps_body[2],
+                     0.5 * omega_rps_body[0], 0.0, 0.5 * omega_rps_body[2], -0.5 * omega_rps_body[1],
+                     0.5 * omega_rps_body[1], -0.5 * omega_rps_body[2], 0.0, 0.5 * omega_rps_body[0],
+                     0.5 * omega_rps_body[2], 0.5 * omega_rps_body[1], -0.5 * omega_rps_body[0], 0.0;
+  grad_quaternion = -grad_quaternion * (tf - to) * unit_time / 2.0;
 
   // u (angular velocity)
   matXd grad_u = matXd::Zero(4, 3);
-  for (int k = 0; k < 3; k++) {
-    u(k) += dx;
-    vec4d f_p_u = dynamics_quaternion(quat, u, unit_u);
-    u(k) -= dx;
-    grad_u.col(k) = -(f_p_u - f_c) / dx * (tf - to) * unit_time / 2.0;
-  }
+  grad_u << -0.5 * quat[1], -0.5 * quat[2], -0.5 * quat[3],
+             0.5 * quat[0], -0.5 * quat[3], 0.5 * quat[2],
+             0.5 * quat[3], 0.5 * quat[0], -0.5 * quat[1],
+             -0.5 * quat[2], 0.5 * quat[1], 0.5 * quat[0];
+  grad_u = -grad_u * unit_u * M_PI / 180.0 * (tf - to) * unit_time / 2.0;
 
   //to, tf
   vec4d grad_to = f_c * unit_time / 2.0;
