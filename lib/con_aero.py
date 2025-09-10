@@ -38,7 +38,6 @@ from .utils_c import (
     q_alpha_array_dimless,
     q_alpha_gradient_dimless_core,
 )
-from .coordinate_c import *
 
 
 def inequality_max_alpha(xdict, pdict, unitdict, condition):
