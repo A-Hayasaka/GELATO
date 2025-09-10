@@ -29,8 +29,6 @@
 
 import sys
 import numpy as np
-from .utils_c import roll_direction_array, roll_direction_array_gradient
-from .coordinate_c import conj, quatrot, normalize
 
 
 def inequality_mass(xdict, pdict, unitdict, condition):
@@ -120,7 +118,6 @@ def inequality_kickturn(xdict, pdict, unitdict, condition):
             ua, ub, xa, xb, n = pdict["ps_params"].get_index(i)
             u_i_ = u_[ua:ub]
             con.append(-u_i_[:, 1])
-            # con.append(u_i_[:,1]+0.36)
 
     return np.concatenate(con, axis=None)
 
@@ -164,19 +161,12 @@ def equality_6DoF_rate(xdict, pdict, unitdict, condition):
 
     con = []
 
-    unit_pos = unitdict["position"]
-
-    pos_ = xdict["position"].reshape(-1, 3)
-    quat_ = xdict["quaternion"].reshape(-1, 4)
-
     u_ = xdict["u"].reshape(-1, 3)
 
     num_sections = pdict["num_sections"]
 
     for i in range(num_sections):
         ua, ub, xa, xb, n = pdict["ps_params"].get_index(i)
-        pos_i_ = pos_[xa:xb]
-        quat_i_ = quat_[xa:xb]
         u_i_ = u_[ua:ub]
 
         # rate constraint
@@ -193,18 +183,18 @@ def equality_6DoF_rate(xdict, pdict, unitdict, condition):
             con.append(u_i_[:, 2])
             con.append(u_i_[1:, 1] - u_i_[0, 1])
 
-        # pitch-yaw : pitch/yaw constant, roll ANGLE is zero
+        # pitch-yaw : pitch/yaw constant, roll rate is zero
         elif att == "pitch-yaw":
             con.append(u_i_[1:, 1] - u_i_[0, 1])
             con.append(u_i_[1:, 2] - u_i_[0, 2])
-            con.append(roll_direction_array(pos_i_[1:] * unit_pos, quat_i_[1:]))
+            con.append(u_i_[:, 0])
 
-        # same-rate : pitch/yaw is the same as previous section, roll ANGLE is zero
+        # same-rate : pitch/yaw is the same as previous section, roll rate is zero
         elif att == "same-rate":
             uf_prev = u_[ua - 1]
             con.append(u_i_[:, 1] - uf_prev[1])
             con.append(u_i_[:, 2] - uf_prev[2])
-            con.append(roll_direction_array(pos_i_[1:] * unit_pos, quat_i_[1:]))
+            con.append(u_i_[:, 0])
 
         # zero-lift-turn or free : roll hold
         elif att == "zero-lift-turn" or att == "free":
@@ -237,11 +227,11 @@ def equality_length_6DoF_rate(xdict, pdict, unitdict, condition):
         elif att == "kick-turn" or att == "pitch":
             res += 3 * n - 1
 
-        # pitch-yaw : pitch/yaw constant, roll ANGLE is zero
+        # pitch-yaw : pitch/yaw constant, roll rate is zero
         elif att == "pitch-yaw":
             res += 3 * n - 2
 
-        # same-rate : pitch/yaw is the same as previous section, roll ANGLE is zero
+        # same-rate : pitch/yaw is the same as previous section, roll rate is zero
         elif att == "same-rate":
             res += 3 * n
 
@@ -261,26 +251,16 @@ def equality_jac_6DoF_rate(xdict, pdict, unitdict, condition):
     """Jacobian of equality_rate."""
 
     jac = {}
-    dx = pdict["dx"]
-
-    unit_pos = unitdict["position"]
-
-    pos_ = xdict["position"].reshape(-1, 3)
-    quat_ = xdict["quaternion"].reshape(-1, 4)
 
     num_sections = pdict["num_sections"]
 
     nRow = equality_length_6DoF_rate(xdict, pdict, unitdict, condition)
-    jac["position"] = {"coo": [[], [], []], "shape": (nRow, pdict["M"] * 3)}
-    jac["quaternion"] = {"coo": [[], [], []], "shape": (nRow, pdict["M"] * 4)}
     jac["u"] = {"coo": [[], [], []], "shape": (nRow, pdict["N"] * 3)}
 
     iRow = 0
 
     for i in range(num_sections):
         ua, ub, xa, xb, n = pdict["ps_params"].get_index(i)
-        pos_i_ = pos_[xa:xb]
-        quat_i_ = quat_[xa:xb]
 
         # rate constraint
 
@@ -312,7 +292,7 @@ def equality_jac_6DoF_rate(xdict, pdict, unitdict, condition):
             jac["u"]["coo"][2].extend([1.0] * (n - 1))
             iRow += n - 1
 
-        # pitch-yaw : pitch/yaw constant, roll ANGLE is zero
+        # pitch-yaw : pitch/yaw constant, roll rate is zero
         elif att == "pitch-yaw":
             jac["u"]["coo"][0].extend(list(range(iRow, iRow + n - 1)))
             jac["u"]["coo"][1].extend([ua * 3 + 1] * (n - 1))
@@ -332,23 +312,12 @@ def equality_jac_6DoF_rate(xdict, pdict, unitdict, condition):
             )
             jac["u"]["coo"][2].extend([1.0] * (n - 1))
             iRow += n - 1
-
-            dfdx = roll_direction_array_gradient(pos_i_[1:], quat_i_[1:], unit_pos, dx)
-            for j in range(3):
-                jac["position"]["coo"][0].extend(list(range(iRow, iRow + n)))
-                jac["position"]["coo"][1].extend(
-                    list(range((xa + 1) * 3 + j, (xa + n + 1) * 3 + j, 3))
-                )
-                jac["position"]["coo"][2].extend(dfdx["position"][:, j])
-            for j in range(4):
-                jac["quaternion"]["coo"][0].extend(list(range(iRow, iRow + n)))
-                jac["quaternion"]["coo"][1].extend(
-                    list(range((xa + 1) * 4 + j, (xa + n + 1) * 4 + j, 4))
-                )
-                jac["quaternion"]["coo"][2].extend(dfdx["quaternion"][:, j])
+            jac["u"]["coo"][0].extend(list(range(iRow, iRow + n)))
+            jac["u"]["coo"][1].extend(list(range(ua * 3, (ua + n) * 3, 3)))
+            jac["u"]["coo"][2].extend([1.0] * n)
             iRow += n
 
-        # same-rate : pitch/yaw is the same as previous section, roll ANGLE is zero
+        # same-rate : pitch/yaw is the same as previous section, roll rate is zero
         elif att == "same-rate":
             jac["u"]["coo"][0].extend(list(range(iRow, iRow + n)))
             jac["u"]["coo"][1].extend([ua * 3 - 2] * n)
@@ -364,20 +333,9 @@ def equality_jac_6DoF_rate(xdict, pdict, unitdict, condition):
             jac["u"]["coo"][1].extend(list(range(ua * 3 + 2, (ua + n) * 3 + 2, 3)))
             jac["u"]["coo"][2].extend([1.0] * n)
             iRow += n
-
-            dfdx = roll_direction_array_gradient(pos_i_[1:], quat_i_[1:], unit_pos, dx)
-            for j in range(3):
-                jac["position"]["coo"][0].extend(list(range(iRow, iRow + n)))
-                jac["position"]["coo"][1].extend(
-                    list(range((xa + 1) * 3 + j, (xa + n + 1) * 3 + j, 3))
-                )
-                jac["position"]["coo"][2].extend(dfdx["position"][:, j])
-            for j in range(4):
-                jac["quaternion"]["coo"][0].extend(list(range(iRow, iRow + n)))
-                jac["quaternion"]["coo"][1].extend(
-                    list(range((xa + 1) * 4 + j, (xa + n + 1) * 4 + j, 4))
-                )
-                jac["quaternion"]["coo"][2].extend(dfdx["quaternion"][:, j])
+            jac["u"]["coo"][0].extend(list(range(iRow, iRow + n)))
+            jac["u"]["coo"][1].extend(list(range(ua * 3, (ua + n) * 3, 3)))
+            jac["u"]["coo"][2].extend([1.0] * n)
             iRow += n
 
         # zero-lift-turn or free : roll hold
