@@ -27,7 +27,7 @@ import numpy as np
 
 def get_index_event(pdict, section_name, key):
     """
-    get index 
+    get index
 
     Args:
         pdict(dict) : parameters
