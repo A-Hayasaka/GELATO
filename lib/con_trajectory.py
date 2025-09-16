@@ -38,7 +38,6 @@ def inequality_mass(xdict, pdict, unitdict, condition):
 
     mass_ = xdict["mass"]
     for index, stage in pdict["RocketStage"].items():
-
         # read index number
         section_ig = [
             i
@@ -134,7 +133,6 @@ def inequality_jac_kickturn(xdict, pdict, unitdict, condition):
 
     nRow = 0
     for i in range(num_sections - 1):
-
         # kick turn
         if "kick" in pdict["params"][i]["attitude"]:
             ua, ub, xa, xb, n = pdict["ps_params"].get_index(i)
