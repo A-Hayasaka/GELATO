@@ -23,6 +23,28 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Dynamics Constraints Module
+============================
+
+Module for defining constraint conditions based on rocket equations of motion.
+
+This module discretizes 6-DOF rocket equations of motion using pseudospectral methods
+and provides them as equality constraints for optimization problems.
+
+Main Features:
+    * Equality constraints for mass time evolution
+    * Equality constraints for position/velocity time evolution (with/without aerodynamics)
+    * Equality constraints for attitude (quaternion) time evolution
+    * Discretization of equations of motion using pseudospectral method
+    * Generate constraint conditions at Legendre-Gauss-Radau collocation points
+
+Constraint Functions:
+    equality_dynamics_mass: Mass equation of motion constraints
+    equality_dynamics_vel: Velocity equation of motion constraints
+    equality_dynamics_quat: Attitude equation of motion constraints
+"""
+
 # constraints_d.py
 # constraints about dynamics
 
@@ -32,7 +54,20 @@ from .dynamics_c import dynamics_velocity, dynamics_velocity_NoAir, dynamics_qua
 
 
 def equality_dynamics_mass(xdict, pdict, unitdict, condition):
-    """Equality constraint about dynamics of mass."""
+    """Equality constraint for mass dynamics.
+    
+    Enforces rocket equation dm/dt = -mdot (propellant consumption rate)
+    using pseudospectral collocation at Legendre-Gauss-Radau points.
+    
+    Args:
+        xdict (dict): State variables including 'mass' and 't'
+        pdict (dict): Problem parameters including section parameters
+        unitdict (dict): Unit scaling factors
+        condition (dict): Flight conditions
+    
+    Returns:
+        ndarray: Constraint residuals (should equal zero)
+    """
 
     con = []
 
@@ -114,7 +149,20 @@ def equality_jac_dynamics_mass(xdict, pdict, unitdict, condition):
 
 
 def equality_dynamics_position(xdict, pdict, unitdict, condition):
-    """Equality constraint about dynamics of position."""
+    """Equality constraint for position dynamics.
+    
+    Enforces kinematic equation dr/dt = v (position rate equals velocity)
+    using pseudospectral collocation at Legendre-Gauss-Radau points.
+    
+    Args:
+        xdict (dict): State variables including 'position', 'velocity', 't'
+        pdict (dict): Problem parameters including section parameters
+        unitdict (dict): Unit scaling factors
+        condition (dict): Flight conditions
+    
+    Returns:
+        ndarray: Constraint residuals (should equal zero)
+    """
 
     con = []
 
@@ -214,7 +262,20 @@ def equality_jac_dynamics_position(xdict, pdict, unitdict, condition):
 
 
 def equality_dynamics_velocity(xdict, pdict, unitdict, condition):
-    """Equality constraint about dynamics of velocity."""
+    """Equality constraint for velocity dynamics.
+    
+    Enforces Newton's second law F = ma: dv/dt = (thrust + aero + gravity)/m
+    using pseudospectral collocation at Legendre-Gauss-Radau points.
+    
+    Args:
+        xdict (dict): State variables (mass, position, velocity, quaternion, time)
+        pdict (dict): Problem parameters including thrust, aerodynamics
+        unitdict (dict): Unit scaling factors
+        condition (dict): Flight conditions including wind table, CA table
+    
+    Returns:
+        ndarray: Constraint residuals (should equal zero)
+    """
 
     con = []
 
@@ -497,7 +558,21 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
 
 
 def equality_dynamics_quaternion(xdict, pdict, unitdict, condition):
-    """Equality constraint about dynamics of quaternion."""
+    """Equality constraint for quaternion dynamics.
+    
+    Enforces kinematic quaternion equation dq/dt = 0.5 * q ⊗ ω
+    using pseudospectral collocation. For attitude hold modes, enforces
+    constant quaternion.
+    
+    Args:
+        xdict (dict): State variables including 'quaternion', 'u', 't'
+        pdict (dict): Problem parameters including attitude mode
+        unitdict (dict): Unit scaling factors
+        condition (dict): Flight conditions
+    
+    Returns:
+        ndarray: Constraint residuals (should equal zero)
+    """
 
     con = []
 

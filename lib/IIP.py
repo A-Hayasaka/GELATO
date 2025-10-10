@@ -23,6 +23,27 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Impact Point Prediction Module
+===============================
+
+Module for calculating IIP (Instantaneous Impact Point).
+
+This module predicts where the rocket will fall if it loses thrust from its
+current position. Provides critical information for flight safety management.
+
+Main Features:
+    * IIP calculation using FAA (Federal Aviation Administration) method
+    * Predict fall trajectory considering air resistance
+    * Calculate high-precision IIP position through iterative computation
+
+Algorithm:
+    Uses iterative calculation method based on FAA-ST IIP calculation technique
+
+Functions:
+    posLLH_IIP_FAA: Calculate IIP using FAA method
+"""
+
 import numpy as np
 from numpy import tan, arcsin, arctan2, sqrt
 

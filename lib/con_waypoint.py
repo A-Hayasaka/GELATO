@@ -23,6 +23,28 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Waypoint Constraints Module
+============================
+
+Module for defining waypoint constraints along the flight path.
+
+This module defines conditions that the rocket must satisfy at specific times or positions
+(altitude, velocity, position, etc.) as constraints.
+
+Main Features:
+    * Altitude constraints at specific times
+    * Velocity constraints at specific times
+    * Constraints for passing through specific points
+    * Flight safety zone constraints
+    * Downrange distance constraints
+
+Constraint Functions:
+    equality_waypoint_altitude: Equality constraints for altitude waypoints
+    equality_waypoint_velocity: Equality constraints for velocity waypoints
+    inequality_waypoint_region: Inequality constraints for flight regions
+"""
+
 # constraints_e.py
 # constraints about waypoint conditions
 

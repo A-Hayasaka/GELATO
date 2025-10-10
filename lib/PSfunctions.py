@@ -23,19 +23,47 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Pseudospectral Method Functions Module
+=======================================
+
+Module providing implementation of Legendre-Gauss-Radau pseudospectral method.
+
+This module provides the mathematical foundation for pseudospectral methods
+to discretize trajectory optimization problems. Uses LGR (Legendre-Gauss-Radau)
+collocation points to achieve high-precision numerical calculations.
+
+Main Features:
+    * Calculate LGR collocation points (nodes)
+    * Calculate Legendre polynomials
+    * Generate differentiation matrices
+    * Lagrange interpolation polynomials
+    * Calculate integration weights
+
+References:
+    * Benson, D. A. (2005). A Gauss Pseudospectral Transcription for Optimal Control
+    * Garg et al. (2009). An overview of three pseudospectral methods
+
+Functions:
+    LegendreFunction: Calculate Legendre polynomials
+    nodes_LGR: Calculate LGR collocation points
+    differentiation_matrix_LGR: Generate LGR differentiation matrix
+    lagrange: Lagrange interpolation polynomial
+"""
+
 from scipy import special
 import numpy as np
 
 
 def LegendreFunction(x, n):
-    """Legendre function of the first kind Pn(x).
+    """Evaluate Legendre polynomial of the first kind Pn(x).
 
     Args:
-        x (float64) : argument of the Legendre function
-        n (int) : degree of the Legendre function
+        x (float64): Argument of the Legendre function, typically ∈ [-1, 1]
+        n (int): Degree of the Legendre polynomial
 
     Returns:
-        float64 : the value of the nth function at x
+        float64: Value of Pn(x)
     """
 
     Legendre, Derivative = special.lpn(n, x)
@@ -43,15 +71,17 @@ def LegendreFunction(x, n):
 
 
 def lagrange(tn, k, t):
-    """Lagrange basis polynominal.
+    """Evaluate kth Lagrange basis polynomial.
+    
+    Computes Lk(t) = ∏(i≠k) (t - ti)/(tk - ti) for interpolation.
 
     Args:
-        tn (ndarray) : data points
-        k (int) : degree of the polynominal
-        t (float64) : argument
+        tn (ndarray): Collocation points (nodes)
+        k (int): Index of the basis polynomial
+        t (float64): Evaluation point
 
     Returns:
-        float64 : value of the kth polynominal at t
+        float64: Value of Lk(t)
     """
     L = 1.0
     N = len(tn)
@@ -62,15 +92,17 @@ def lagrange(tn, k, t):
 
 
 def lagrangeD(tn, k, t):
-    """Differentiation of Lagrange basis polynominal.
+    """Evaluate derivative of kth Lagrange basis polynomial.
+    
+    Computes dLk/dt at point t using analytic differentiation.
 
     Args:
-        tn (ndarray) : data points
-        k (int) : degree of the polynominal
-        t (float64) : argument
+        tn (ndarray): Collocation points (nodes)
+        k (int): Index of the basis polynomial
+        t (float64): Evaluation point
 
     Returns:
-        float64 : differential coefficient of the kth polynominal at t
+        float64: Value of dLk/dt at t
     """
     N = len(tn)
     den = 1.0
@@ -89,14 +121,30 @@ def lagrangeD(tn, k, t):
 
 
 def nodes_LGL(n):
-    """Legendre-Gauss-Lobatto(LGL) points"""
+    """Compute Legendre-Gauss-Lobatto (LGL) collocation points.
+    
+    Returns n points including boundary points at -1 and +1.
+    
+    Args:
+        n (int): Number of LGL points
+    
+    Returns:
+        ndarray: LGL nodes in [-1, 1]
+    """
     roots, weight = special.j_roots(n - 2, 1, 1)
     nodes = np.hstack((-1, roots, 1))
     return nodes
 
 
 def weight_LGL(n):
-    """Legendre-Gauss-Lobatto(LGL) weights."""
+    """Compute Legendre-Gauss-Lobatto (LGL) quadrature weights.
+    
+    Args:
+        n (int): Number of LGL points
+    
+    Returns:
+        ndarray: LGL quadrature weights
+    """
     nodes = nodes_LGL(n)
     w = np.zeros(0)
     for i in range(n):
@@ -105,7 +153,16 @@ def weight_LGL(n):
 
 
 def differentiation_matrix_LGL(n):
-    """Legendre-Gauss-Lobatto(LGL) differentiation matrix."""
+    """Compute Legendre-Gauss-Lobatto (LGL) differentiation matrix.
+    
+    Generates matrix D such that df/dτ ≈ D·f for interpolating polynomial.
+    
+    Args:
+        n (int): Number of LGL points
+    
+    Returns:
+        ndarray: n×n differentiation matrix
+    """
     tau = nodes_LGL(n)
     D = np.zeros((n, n))
     for i in range(n):
@@ -126,17 +183,40 @@ def differentiation_matrix_LGL(n):
 
 
 def nodes_LG(n):
-    """Legendre-Gauss(LG) points"""
+    """Compute Legendre-Gauss (LG) collocation points.
+    
+    Args:
+        n (int): Number of LG points
+    
+    Returns:
+        ndarray: LG nodes in (-1, 1) (excludes boundaries)
+    """
     return special.roots_legendre(n)[0]
 
 
 def weight_LG(n):
-    """Legendre-Gauss(LG) weights."""
+    """Compute Legendre-Gauss (LG) quadrature weights.
+    
+    Args:
+        n (int): Number of LG points
+    
+    Returns:
+        ndarray: LG quadrature weights
+    """
     return special.roots_legendre(n)[1]
 
 
 def differentiation_matrix_LG(n):
-    """Legendre-Gauss(LG) differentiation matrix."""
+    """Compute Legendre-Gauss (LG) differentiation matrix.
+    
+    Generates matrix D such that df/dτ ≈ D·f for interpolating polynomial.
+    
+    Args:
+        n (int): Number of LG points
+    
+    Returns:
+        ndarray: n×(n+1) differentiation matrix
+    """
     tk_lg, _ = special.roots_legendre(n)
     tk_lg = np.hstack((-1.0, tk_lg))
     D = np.zeros((n, n + 1))
@@ -169,7 +249,14 @@ def nodes_LGR(n, reverse=True):
 
 
 def weight_LGR(n):
-    """Legendre-Gauss-Radau(LGR) weights."""
+    """Compute Legendre-Gauss-Radau (LGR) quadrature weights.
+    
+    Args:
+        n (int): Number of LGR points (n >= 2)
+    
+    Returns:
+        ndarray: LGR quadrature weights
+    """
     nodes = nodes_LGR(n)
     w = np.zeros(0)
     for i in range(n):
@@ -180,16 +267,18 @@ def weight_LGR(n):
 
 
 def differentiation_matrix_LGR(n, reverse=True):
-    """Legendre-Gauss-Radau(LGR) differentiation matrix.
+    """Compute Legendre-Gauss-Radau (LGR) differentiation matrix.
+    
+    Generates matrix D such that df/dτ ≈ D·f at LGR collocation points,
+    where f includes values at both interior nodes and one boundary.
 
     Args:
-        n (int) : number of degrees. (n >= 2)
-        reverse (boolean) : type of LGR points. The LGR node
-        includes -1 when reverse is false and it includes +1 when
-        reverse is true.
+        n (int): Number of LGR points (n >= 2)
+        reverse (boolean): LGR type. If True, includes boundary at +1;
+                          if False, includes boundary at -1
 
     Returns:
-        ndarray: differentiation matrix (n * n+1).
+        ndarray: n×(n+1) differentiation matrix
 
     """
 

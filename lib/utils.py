@@ -23,6 +23,30 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Utilities Module
+================
+
+Module providing general-purpose helper functions.
+
+This module provides auxiliary functions for calculating various physical
+quantities and coordinate transformations.
+
+Main Features:
+    * Calculate dynamic pressure
+    * Calculate angle of attack
+    * Calculate heating rate
+    * Interpolate wind velocity
+    * Helper functions for vector operations
+
+Functions:
+    dynamic_pressure_pa: Calculate dynamic pressure [Pa]
+    angle_of_attack_all_rad: Calculate total angle of attack [rad]
+    q_alpha_pa_rad: Calculate q-α product
+    heating_rate: Calculate heating rate [W/m^2]
+    wind_ned: Get wind velocity in NED coordinate system
+"""
+
 from math import sin, cos, asin, atan2, sqrt, radians, degrees
 import numpy as np
 from numpy.linalg import norm
@@ -31,16 +55,23 @@ from .coordinate import *
 
 
 def haversine(lon1, lat1, lon2, lat2, r):
-    """Calculates surface distance with haversine formula.
-    This function is DEPRECATED; use Vincenty formula instead.
+    """Calculate great-circle distance using haversine formula (DEPRECATED).
+    
+    Computes spherical distance between two points. For accurate geodetic
+    distance on WGS84 ellipsoid, use Vincenty formula instead.
+    
     Args:
-        lon1 (float64) : longitude of start point [deg]
-        lat1 (float64) : latitude of start point [deg]
-        lon2 (float64) : longitude of end point [deg]
-        lat2 (float64) : latitude of end point [deg]
-        r (float64) : radius of the sphere
+        lon1 (float64): Longitude of start point [deg]
+        lat1 (float64): Latitude of start point [deg]
+        lon2 (float64): Longitude of end point [deg]
+        lat2 (float64): Latitude of end point [deg]
+        r (float64): Sphere radius [m]
+    
     Returns:
-        float64 : surface distance between start and end points
+        float64: Great-circle distance [m]
+    
+    Note:
+        DEPRECATED - Use Vincenty formula for WGS84 ellipsoid accuracy
     """
 
     # convert decimal degrees to radians
@@ -57,18 +88,24 @@ def haversine(lon1, lat1, lon2, lat2, r):
 
 
 def distance_on_earth(x_km, y_km, z_km, lon0, lat0, time):
-    """Calculates surface distance of two points on Earth with
-    haversine formula.
-    This function is DEPRECATED; use Vincenty formula instead.
+    """Calculate surface distance using haversine formula (DEPRECATED).
+    
+    Computes distance from reference point to ECEF position using spherical
+    approximation. Use Vincenty formula for accurate WGS84 ellipsoid distance.
+    
     Args:
-        x_km (float64) : x-coordinates of target point in ECEF frame [km]
-        y_km (float64) : y-coordinates of target point in ECEF frame [km]
-        z_km (float64) : z-coordinates of target point in ECEF frame [km]
-        lon0 (float64) : longitude of reference point [deg]
-        lat0 (float64) : latitude of reference point [deg]
-        time (float64) : time [s]
+        x_km (float64): X-coordinate of target in ECEF frame [km]
+        y_km (float64): Y-coordinate of target in ECEF frame [km]
+        z_km (float64): Z-coordinate of target in ECEF frame [km]
+        lon0 (float64): Longitude of reference point [deg]
+        lat0 (float64): Latitude of reference point [deg]
+        time (float64): Time [s]
+    
     Returns:
-        float64 : surface distance between reference and target points[km]
+        float64: Surface distance [km]
+    
+    Note:
+        DEPRECATED - Use Vincenty formula for WGS84 ellipsoid accuracy
     """
     radius_km = 6378.142
     angular_velocity_rps = 0.729211586e-4
@@ -81,7 +118,15 @@ def distance_on_earth(x_km, y_km, z_km, lon0, lat0, time):
 
 
 def wind_ned(altitude_m, wind_data):
-    """Get wind speed in NED frame by interpolation."""
+    """Get wind velocity in NED frame by linear interpolation.
+    
+    Args:
+        altitude_m (float): Altitude [m]
+        wind_data (ndarray): Wind table with columns [altitude, north, east]
+    
+    Returns:
+        ndarray: Wind velocity [north, east, down] in NED frame [m/s]
+    """
     wind = np.zeros(3)
     wind[0] = np.interp(altitude_m, wind_data[:, 0], wind_data[:, 1])
     wind[1] = np.interp(altitude_m, wind_data[:, 0], wind_data[:, 2])
@@ -90,16 +135,20 @@ def wind_ned(altitude_m, wind_data):
 
 
 def angle_of_attack_all_rad(pos_eci, vel_eci, quat, t, wind):
-    """Calculates total angle of attack.
+    """Calculate total angle of attack.
+    
+    Computes angle between velocity vector (relative to air) and vehicle
+    thrust axis. Accounts for wind effects.
+    
     Args:
-        pos_eci (ndarray) : position in ECI frame [m]
-        vel_eci (ndarray) : inertial velocity in ECI frame [m/s]
-        quat (ndarray) : coordinate transformation quaternion from ECI
-          to body frame
-        t (float64) : time [s]
-        wind (ndarray) : wind table
+        pos_eci (ndarray): Position in ECI frame [m]
+        vel_eci (ndarray): Inertial velocity in ECI frame [m/s]
+        quat (ndarray): Quaternion from ECI to body frame
+        t (float64): Time [s]
+        wind (ndarray): Wind velocity table
+    
     Returns:
-        float64 : angle of attack [rad]
+        float64: Total angle of attack [rad]
     """
 
     thrust_dir_eci = quatrot(conj(quat), np.array([1.0, 0.0, 0.0]))
@@ -122,7 +171,20 @@ def angle_of_attack_all_rad(pos_eci, vel_eci, quat, t, wind):
 
 
 def angle_of_attack_all_array_rad(pos_eci, vel_eci, quat, t, wind):
-    """Array version of angle_of_attack_all_rad."""
+    """Calculate total angle of attack for array of states.
+    
+    Vectorized version of angle_of_attack_all_rad.
+    
+    Args:
+        pos_eci (ndarray): Position array in ECI frame [m]
+        vel_eci (ndarray): Velocity array in ECI frame [m/s]
+        quat (ndarray): Quaternion array from ECI to body frame
+        t (ndarray): Time array [s]
+        wind (ndarray): Wind velocity table
+    
+    Returns:
+        ndarray: Total angle of attack array [rad]
+    """
     alpha = np.zeros(pos_eci.shape[0])
     for i in range(pos_eci.shape[0]):
         alpha[i] = angle_of_attack_all_rad(pos_eci[i], vel_eci[i], quat[i], t[i], wind)
@@ -130,16 +192,20 @@ def angle_of_attack_all_array_rad(pos_eci, vel_eci, quat, t, wind):
 
 
 def angle_of_attack_ab_rad(pos_eci, vel_eci, quat, t, wind):
-    """Calculates pitch and yaw angles of attack.
+    """Calculate pitch and yaw angles of attack separately.
+    
+    Decomposes total angle of attack into pitch (alpha) and yaw (beta)
+    components in body frame.
+    
     Args:
-        pos_eci (ndarray) : position in ECI frame [m]
-        vel_eci (ndarray) : inertial velocity in ECI frame [m/s]
-        quat (ndarray) : coordinate transformation quaternion from ECI
-          to body frame
-        t (float64) : time [s]
-        wind (ndarray) : wind table
+        pos_eci (ndarray): Position in ECI frame [m]
+        vel_eci (ndarray): Inertial velocity in ECI frame [m/s]
+        quat (ndarray): Quaternion from ECI to body frame
+        t (float64): Time [s]
+        wind (ndarray): Wind velocity table
+    
     Returns:
-        ndarray : pitch and yaw angles of attack [rad]
+        ndarray: [alpha, beta] - pitch and yaw angles of attack [rad]
     """
 
     pos_llh = ecef2geodetic(pos_eci[0], pos_eci[1], pos_eci[2])

@@ -8,3 +8,7 @@ data/*
 test/*
 *.so
 *.o
+*.__pycache__/*
+*.pyc
+*.pyo
+docs/_build/*

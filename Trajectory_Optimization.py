@@ -23,6 +23,29 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+GELATO: Generic Launch Trajectory Optimizer
+============================================
+
+Main script for optimizing rocket launch trajectories.
+
+This script solves rocket launch trajectory optimization problems using the
+Legendre-Gauss-Radau pseudospectral method.
+
+Main Features:
+    * Load parameters from JSON format settings files
+    * Support for multi-stage rocket trajectory optimization
+    * Maximize payload mass or achieve target orbit insertion
+    * Support for user-defined constraints
+    * Solve nonlinear programming problems using IPOPT/SNOPT solvers
+
+Usage:
+    python Trajectory_Optimization.py [settings_file_name]
+
+Example:
+    python Trajectory_Optimization.py example/example-settings.json
+"""
+
 import sys
 import json
 import pickle

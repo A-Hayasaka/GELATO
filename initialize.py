@@ -23,6 +23,28 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Initialization Module
+=====================
+
+Module for generating initial guess values for trajectory optimization problems.
+
+This module calculates initial guess values to pass to the optimization solver.
+It generates initial trajectories through numerical integration based on parameters
+loaded from settings files.
+
+Main Features:
+    * Load initial guess values from settings files
+    * Generate initial trajectories through numerical integration of equations of motion
+    * Generate initial guess values from previous optimization results
+    * Convert initial guess values to variable dictionaries
+
+Functions:
+    dynamics_init: Equations of motion for initial guess generation
+    initialize_xdict_6DoF_from_file: Load initial guess from file
+    initialize_xdict_6DoF_2: Generate initial guess through numerical integration
+"""
+
 import sys
 import numpy as np
 from scipy.interpolate import interp1d
@@ -35,24 +57,31 @@ from output_result import output_result
 
 
 def dynamics_init(x, u, t, param, zlt, wind, ca):
-    """Full equation of motion.
+    """Full equation of motion for initial guess generation.
+
+    This function computes the time derivatives of the state vector for
+    numerical integration to generate initial trajectory guesses.
 
     Args:
-        x (ndarray) : state vector
-        (mass[kg], posion in ECI frame[m],
-          inertial velocity in ECI frame[m/s],
-          quaternion from ECI to body frame)
-        u (ndarray) : rate in body frame[deg/s]
-        t (float64) : time[s]
-        param (ndarray) : parameters
-        (thrust at vacuum[N], massflow rate[kg/s],
-          reference area[m2], (unused), nozzle area[m2])
-        zlt (boolean) : True when zero-lift turn mode
-        wind (ndarray) : wind table
-        ca (ndarray) : CA table
+        x (ndarray): State vector [11 elements]
+            [0]: mass [kg]
+            [1:4]: position in ECI frame [m]
+            [4:7]: inertial velocity in ECI frame [m/s]
+            [7:11]: quaternion from ECI to body frame
+        u (ndarray): Angular rates in body frame [deg/s] [roll, pitch, yaw]
+        t (float64): Time since epoch [s]
+        param (ndarray): Rocket parameters [5 elements]
+            [0]: thrust at vacuum [N]
+            [1]: mass flow rate [kg/s]
+            [2]: reference area [m^2]
+            [3]: (unused)
+            [4]: nozzle exit area [m^2]
+        zlt (bool): True when zero-lift turn mode is enabled
+        wind (ndarray): Wind table with columns [altitude, wind_north, wind_east]
+        ca (ndarray): Axial force coefficient table [Mach, CA]
 
     Returns:
-        differential of the state vector
+        ndarray: Time derivative of the state vector (same shape as x)
 
     """
 

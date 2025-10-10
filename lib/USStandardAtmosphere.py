@@ -23,6 +23,35 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+U.S. Standard Atmosphere Module
+================================
+
+Module implementing atmospheric model based on U.S. Standard Atmosphere 1976.
+
+This module calculates atmospheric physical quantities (density, pressure,
+temperature, speed of sound, etc.) as a function of altitude.
+Used for rocket aerodynamic calculations.
+
+Main Features:
+    * Calculate atmospheric density vs. altitude
+    * Calculate atmospheric pressure vs. altitude
+    * Calculate temperature vs. altitude
+    * Calculate speed of sound
+    * Convert geopotential altitude
+
+References:
+    U.S. Standard Atmosphere, 1976
+    NASA-TM-X-74335
+
+Functions:
+    geopotential_altitude: Calculate geopotential altitude
+    airdensity_at: Calculate atmospheric density
+    airpressure_at: Calculate atmospheric pressure
+    temperature_at: Calculate temperature
+    speed_of_sound: Calculate speed of sound
+"""
+
 import math
 from math import sqrt
 import numpy as np
@@ -31,13 +60,20 @@ import numpy as np
 
 
 def geopotential_altitude(z):
-    """Calculates geopotential altitude.
-    Refer to US1976 Equation 18.
+    """Calculate geopotential altitude from geometric altitude.
+    
+    Converts geometric altitude to geopotential altitude using the relationship
+    defined in U.S. Standard Atmosphere 1976, Equation 18. For altitudes above
+    86 km, returns the geometric altitude unchanged.
+    
     Args:
-        z (float64) : geometric altitude [m]
+        z (float64): Geometric altitude [m]
+    
     Returns:
-        float64 : geopotential altitude (z <= 86000),
-        geopotential altitude (z > 86000) [m]
+        float64: Geopotential altitude [m] (z <= 86000 m), or geometric altitude (z > 86000 m)
+    
+    Reference:
+        U.S. Standard Atmosphere, 1976, NASA-TM-X-74335
     """
 
     r0 = 6356766
@@ -50,17 +86,24 @@ def geopotential_altitude(z):
 
 
 def us_standard_atmosphere_params_at(altitude_m):
-    """Returns parameters at each reference levels.
-    The values of temperature gradient for the layer from 91 to 110 km
-    and above 120km are dummy values for calculation of the approximate
-    pressure.
+    """Get atmospheric parameters at reference levels for given altitude.
+    
+    Returns the atmospheric parameters for the appropriate atmospheric layer
+    based on the U.S. Standard Atmosphere 1976 model. Temperature gradients
+    for layers from 91-110 km and above 120 km are approximate values.
+    
     Args:
-        altitude_m (float64) : geopotential altitude when Z <= 86000,
-        geometric altitude when Z > 86000 [m]
+        altitude_m (float64): Geopotential altitude (Z <= 86000 m) or
+                             geometric altitude (Z > 86000 m) [m]
+    
     Returns:
-        ndarray: parameters (altitude[m], temperature gradient[K/m],
-        temperature[K], pressure[Pa], gas constant[J/kg-K],
-        gravity acceleration[m/s2])
+        ndarray: Atmospheric parameters [6 elements]
+            [0]: Reference altitude [m]
+            [1]: Temperature gradient (lapse rate) [K/m]
+            [2]: Reference temperature [K]
+            [3]: Reference pressure [Pa]
+            [4]: Specific gas constant [J/(kg·K)]
+            [5]: Gravity acceleration [m/s²]
     """
 
     GRAVITY_ACC_CONST = 9.80665
@@ -91,13 +134,22 @@ def us_standard_atmosphere_params_at(altitude_m):
 
 
 def airtemperature_at(altitude_m):
-    """Air temperature at the given altitude.
-    Refer to US1976 Section 1.2.5.
+    """Calculate air temperature at given altitude.
+    
+    Computes atmospheric temperature using different models for different
+    altitude regimes as defined in U.S. Standard Atmosphere 1976, Section 1.2.5.
+    Uses linear gradient below 91 km, molecular temperature model 91-110 km,
+    and exponential model above 120 km.
+    
     Args:
-        altitude_m (float64) : geopotential altitude when Z <= 86000,
-        geometric altitude when Z > 86000 [m]
+        altitude_m (float64): Geopotential altitude (Z <= 86000 m) or
+                             geometric altitude (Z > 86000 m) [m]
+    
     Returns:
-        float64: temperature[K]
+        float64: Air temperature [K]
+    
+    Reference:
+        U.S. Standard Atmosphere, 1976, Section 1.2.5
     """
 
     air_params = us_standard_atmosphere_params_at(altitude_m)
@@ -125,14 +177,22 @@ def airtemperature_at(altitude_m):
 
 
 def airpressure_at(altitude_m):
-    """Air pressure at the given altitude.
-    Refer to US1976 Section 1.3.1.
-    The value above 86000m is an approximation by fitting.
+    """Calculate air pressure at given altitude.
+    
+    Computes atmospheric pressure using the hydrostatic equation as defined
+    in U.S. Standard Atmosphere 1976, Section 1.3.1. Uses exact formulas for
+    isothermal and gradient layers below 86 km, and approximate fitting for
+    altitudes above 86 km.
+    
     Args:
-        altitude_m (float64) : geopotential altitude when Z <= 86000,
-        geometric altitude when Z > 86000 [m]
+        altitude_m (float64): Geopotential altitude (Z <= 86000 m) or
+                             geometric altitude (Z > 86000 m) [m]
+    
     Returns:
-        float64: pressure[Pa]
+        float64: Air pressure [Pa]
+    
+    Reference:
+        U.S. Standard Atmosphere, 1976, Section 1.3.1
     """
 
     air_params = us_standard_atmosphere_params_at(altitude_m)
@@ -154,14 +214,21 @@ def airpressure_at(altitude_m):
 
 
 def airdensity_at(altitude_m):
-    """Air density at the given altitude.
-    Refer to US1976 Section 1.3.4.
-    The value above 86000m is an approximation by fitting.
+    """Calculate air density at given altitude.
+    
+    Computes atmospheric mass density using the ideal gas law and hydrostatic
+    equation as defined in U.S. Standard Atmosphere 1976, Section 1.3.4.
+    Values above 86 km are approximations using fitted models.
+    
     Args:
-        altitude_m (float64) : geopotential altitude when Z <= 86000,
-        geometric altitude when Z > 86000 [m]
+        altitude_m (float64): Geopotential altitude (Z <= 86000 m) or
+                             geometric altitude (Z > 86000 m) [m]
+    
     Returns:
-        float64: mass density[kg/m3]
+        float64: Air mass density [kg/m³]
+    
+    Reference:
+        U.S. Standard Atmosphere, 1976, Section 1.3.4
     """
 
     air_params = us_standard_atmosphere_params_at(altitude_m)
@@ -184,13 +251,21 @@ def airdensity_at(altitude_m):
 
 
 def speed_of_sound(altitude_m):
-    """Speed of sound at the given altitude.
-    Refer to US1976 Section 1.3.10.
+    """Calculate speed of sound at given altitude.
+    
+    Computes the speed of sound in air using temperature as defined in
+    U.S. Standard Atmosphere 1976, Section 1.3.10. Uses the formula
+    a = sqrt(γ * R * T) where γ is the ratio of specific heats.
+    
     Args:
-        altitude_m (float64) : geopotential altitude when Z <= 86000,
-        geometric altitude when Z > 86000 [m]
+        altitude_m (float64): Geopotential altitude (Z <= 86000 m) or
+                             geometric altitude (Z > 86000 m) [m]
+    
     Returns:
-        float64: speed of sound[m/s]
+        float64: Speed of sound [m/s]
+    
+    Reference:
+        U.S. Standard Atmosphere, 1976, Section 1.3.10
     """
 
     air_params = us_standard_atmosphere_params_at(altitude_m)

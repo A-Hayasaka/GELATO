@@ -23,6 +23,24 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Downrange Calculation Module
+=============================
+
+Module for calculating flight distance (downrange) from launch site.
+
+This module calculates the ground surface distance from the rocket's current
+position to the launch site. Used for flight analysis and performance evaluation.
+
+Main Features:
+    * Calculate ground surface distance from launch site
+    * Calculate great circle distance
+    * Calculate azimuth angle
+
+Functions:
+    calculate_downrange: Calculate downrange distance
+"""
+
 import sys
 import shutil
 import pandas as pd

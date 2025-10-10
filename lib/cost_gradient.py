@@ -23,6 +23,24 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Cost Gradient Module
+====================
+
+Module for defining objective functions and their gradients.
+
+This module calculates the objective function (cost function) for trajectory
+optimization problems and its gradient vector.
+
+Main Optimization Modes:
+    * Payload: Maximize payload mass (maximize initial mass)
+    * Time: Minimize arrival time (maximize residual propellant)
+
+Functions:
+    cost_6DoF: Calculate objective function
+    cost_jac: Calculate gradient vector of objective function
+"""
+
 import numpy as np
 
 

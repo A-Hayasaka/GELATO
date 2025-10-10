@@ -23,6 +23,31 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Aerodynamic Constraints Module
+===============================
+
+Module for defining aerodynamic constraint conditions.
+
+This module calculates aerodynamic constraints (dynamic pressure, heating rate,
+angle of attack, etc.) during rocket flight and provides them as constraint
+conditions for optimization problems.
+
+Main Features:
+    * Calculate and constrain dynamic pressure
+    * Calculate q-α (dynamic pressure × angle of attack) constraints
+    * Calculate heating rate
+    * Angle of attack constraints
+    * Equality constraints calculation
+    * Inequality constraints calculation
+
+Constraint Functions:
+    dynamic_pressure_dimless: Non-dimensionalized dynamic pressure
+    angle_of_attack_dimless: Non-dimensionalized angle of attack
+    q_alpha_dimless: Non-dimensionalized q-α product
+    heating_rate_dimless: Non-dimensionalized heating rate
+"""
+
 # constraints_c.py
 # constraints about aerodynamic conditions
 
@@ -39,7 +64,21 @@ from .coordinate_c import *
 
 
 def dynamic_pressure_dimless(pos_eci_e, vel_eci_e, t_e, wind, units):
-    """Returns dynamic pressure normalized by its maximum value."""
+    """Calculate normalized dynamic pressure.
+    
+    Computes dynamic pressure q = 0.5 * ρ * v² normalized by maximum
+    allowable value for constraint evaluation.
+    
+    Args:
+        pos_eci_e (ndarray): Position in ECI frame (scaled)
+        vel_eci_e (ndarray): Velocity in ECI frame (scaled)
+        t_e (float): Time (scaled)
+        wind (ndarray): Wind velocity table
+        units (ndarray): [pos_scale, vel_scale, time_scale, q_max]
+    
+    Returns:
+        float: Normalized dynamic pressure (dimensionless)
+    """
     pos_eci = pos_eci_e * units[0]
     vel_eci = vel_eci_e * units[1]
     t = t_e * units[2]
@@ -55,7 +94,22 @@ def dynamic_pressure_array_dimless(pos_eci_e, vel_eci_e, t_e, wind, units):
 
 
 def angle_of_attack_all_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
-    """Returns angle of attack normalized by its maximum value."""
+    """Calculate normalized total angle of attack.
+    
+    Computes total angle of attack (magnitude combining pitch and yaw)
+    normalized by maximum allowable value for constraint evaluation.
+    
+    Args:
+        pos_eci_e (ndarray): Position in ECI frame (scaled)
+        vel_eci_e (ndarray): Velocity in ECI frame (scaled)
+        quat (ndarray): Attitude quaternion
+        t_e (float): Time (scaled)
+        wind (ndarray): Wind velocity table
+        units (ndarray): [pos_scale, vel_scale, time_scale, alpha_max]
+    
+    Returns:
+        float: Normalized total angle of attack (dimensionless)
+    """
     pos_eci = pos_eci_e * units[0]
     vel_eci = vel_eci_e * units[1]
     t = t_e * units[2]
@@ -71,7 +125,22 @@ def angle_of_attack_all_array_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, uni
 
 
 def q_alpha_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
-    """Returns Q-alpha normalized by its maximum value."""
+    """Calculate normalized Q-alpha product.
+    
+    Computes Q-alpha (dynamic pressure × angle of attack) normalized
+    by maximum allowable value. Critical constraint for structural loads.
+    
+    Args:
+        pos_eci_e (ndarray): Position in ECI frame (scaled)
+        vel_eci_e (ndarray): Velocity in ECI frame (scaled)
+        quat (ndarray): Attitude quaternion
+        t_e (float): Time (scaled)
+        wind (ndarray): Wind velocity table
+        units (ndarray): [pos_scale, vel_scale, time_scale, q_alpha_max]
+    
+    Returns:
+        float: Normalized Q-alpha (dimensionless)
+    """
     pos_eci = pos_eci_e * units[0]
     vel_eci = vel_eci_e * units[1]
     t = t_e * units[2]

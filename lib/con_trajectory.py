@@ -23,6 +23,26 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Trajectory Constraints Module
+==============================
+
+Module for defining constraint conditions for the entire trajectory.
+
+This module defines constraints that span the entire flight path (angular velocity limits,
+mass constraints, etc.) and provides them as inequality constraints for optimization problems.
+
+Main Features:
+    * Constraints on roll, pitch, and yaw angular velocities
+    * Non-negative constraints on propellant mass
+    * Limits on attitude change rate
+    * Smoothness constraints on control inputs
+
+Constraint Functions:
+    inequality_turn_rate: Inequality constraints on angular velocity
+    inequality_propellant_mass: Inequality constraints on propellant mass
+"""
+
 # constraints_b.py
 # constraints about stage mass and turn rate
 

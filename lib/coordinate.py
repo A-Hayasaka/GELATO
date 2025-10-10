@@ -23,13 +23,57 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Coordinate Transformation Module
+=================================
+
+Module providing coordinate system transformations and quaternion operations.
+
+This module implements coordinate transformation functions required for rocket
+trajectory calculations, including conversions between ECI (Earth-Centered Inertial),
+ECEF (Earth-Centered Earth-Fixed), geodetic, and NED (North-East-Down) coordinate systems.
+
+Main Coordinate Systems:
+    * ECI: Earth-Centered Inertial
+    * ECEF: Earth-Centered Earth-Fixed
+    * LLH: Latitude-Longitude-Height (Geodetic coordinates)
+    * NED: North-East-Down
+
+Main Features:
+    * Quaternion operations (multiplication, conjugate, rotation)
+    * Coordinate system transformations (ECI⇔ECEF⇔Geodetic)
+    * Velocity vector coordinate transformations
+    * Orbital elements calculation
+    * Gravity calculation
+    * Distance calculation (Vincenty method)
+
+Functions:
+    quatmult: Quaternion multiplication
+    quatrot: Rotation by quaternion
+    eci2ecef, ecef2eci: ECI-ECEF transformation
+    geodetic2ecef, ecef2geodetic: Geodetic-ECEF transformation
+    orbital_elements: Calculate orbital elements
+    gravity: Calculate gravity acceleration
+"""
+
 from math import sin, cos, asin, acos, atan2, degrees, radians, sqrt
 import numpy as np
 from numpy.linalg import norm
 
 
 def quatmult(q, p):
-    """Multiplies two quaternions."""
+    """Multiply two quaternions.
+    
+    Computes the Hamilton product of two quaternions: q * p
+    Quaternion format: [w, x, y, z] where w is the scalar part.
+    
+    Args:
+        q (ndarray): First quaternion [w, x, y, z]
+        p (ndarray): Second quaternion [w, x, y, z]
+    
+    Returns:
+        ndarray: Product quaternion q * p
+    """
     qp0 = q[0] * p[0] - q[1] * p[1] - q[2] * p[2] - q[3] * p[3]
     qp1 = q[1] * p[0] + q[0] * p[1] - q[3] * p[2] + q[2] * p[3]
     qp2 = q[2] * p[0] + q[3] * p[1] + q[0] * p[2] - q[1] * p[3]
@@ -38,7 +82,16 @@ def quatmult(q, p):
 
 
 def conj(q):
-    """Returns conjugate of quaternion."""
+    """Compute the conjugate of a quaternion.
+    
+    For quaternion q = [w, x, y, z], returns q* = [w, -x, -y, -z]
+    
+    Args:
+        q (ndarray): Input quaternion [w, x, y, z]
+    
+    Returns:
+        ndarray: Conjugate quaternion [w, -x, -y, -z]
+    """
     return np.array([q[0], -q[1], -q[2], -q[3]])
 
 
@@ -53,15 +106,17 @@ def normalize(v):
 
 
 def quatrot(q, v):
-    """Rotates a vector with coordinate transformation quaternion.
-    This function calculates conj(q) * v * q, where the sign * means
-    quaternion product.
+    """Rotate a vector using a coordinate transformation quaternion.
+    
+    This function calculates q* ⊗ v ⊗ q, where ⊗ denotes quaternion
+    multiplication. This rotates vector v from frame A to frame B.
+    
     Args:
-        q (ndarray) : The quaternion that represents transformation
-        from A-frame to B-frame.
-        v (ndarray) : The representation of vector in A-frame.
+        q (ndarray): Quaternion representing transformation from frame A to frame B [w, x, y, z]
+        v (ndarray): 3D vector in frame A [x, y, z]
+    
     Returns:
-        ndarray : The representation of the input vector in B-frame.
+        ndarray: 3D vector rotated to frame B [x, y, z]
     """
     vq = np.array((0.0, v[0], v[1], v[2]))
     rvq = quatmult(conj(q), quatmult(vq, q))
@@ -69,7 +124,17 @@ def quatrot(q, v):
 
 
 def dcm_from_quat(q):
-    """Converts a quaternion to a direction cosine matrix (DCM)."""
+    """Convert quaternion to direction cosine matrix (DCM).
+    
+    Computes the 3x3 rotation matrix corresponding to the given quaternion.
+    The DCM transforms vectors from one coordinate frame to another.
+    
+    Args:
+        q (ndarray): Quaternion [w, x, y, z]
+    
+    Returns:
+        ndarray: 3x3 direction cosine matrix
+    """
     C = np.zeros((3, 3))
     C[0, 0] = q[0] ** 2 + q[1] ** 2 - q[2] ** 2 - q[3] ** 2
     C[0, 1] = 2.0 * (q[1] * q[2] + q[0] * q[3])
@@ -87,7 +152,17 @@ def dcm_from_quat(q):
 
 
 def quat_from_dcm(C):
-    """Converts a direction cosine matrix (DCM) into a quaternion."""
+    """Convert direction cosine matrix (DCM) to quaternion.
+    
+    Extracts a unit quaternion from a 3x3 rotation matrix using the
+    Shepperd method to avoid numerical issues near singularities.
+    
+    Args:
+        C (ndarray): 3x3 direction cosine matrix
+    
+    Returns:
+        ndarray: Quaternion [w, x, y, z]
+    """
     if (1.0 + C[0, 0] + C[1, 1] + C[2, 2]) < 0.0:
         print("quaternion conversion error")
         return np.array((1.0, 0.0, 0.0, 0.0))
@@ -101,14 +176,18 @@ def quat_from_dcm(C):
 
 
 def ecef2geodetic(x, y, z):
-    """Converts a position in ECEF frame into a geodetic coordinates.
+    """Convert ECEF coordinates to geodetic coordinates (WGS84).
+    
+    Uses iterative algorithm to convert Earth-Centered Earth-Fixed (ECEF)
+    Cartesian coordinates to geodetic latitude, longitude, and altitude.
+    
     Args:
-        x (float64) : X-coordinate of the position [m]
-        y (float64) : Y-coordinate of the position [m]
-        z (float64) : Z-coordinate of the position [m]
+        x (float64): X-coordinate in ECEF frame [m]
+        y (float64): Y-coordinate in ECEF frame [m]
+        z (float64): Z-coordinate in ECEF frame [m]
+    
     Returns:
-        ndarray : The combination of latitude [deg], longitude [deg]
-        and altitude [m] of the input position in WGS84.
+        ndarray: [latitude [deg], longitude [deg], altitude [m]] in WGS84
     """
 
     a = 6378137.0
@@ -129,14 +208,18 @@ def ecef2geodetic(x, y, z):
 
 
 def geodetic2ecef(lat, lon, alt):
-    """Converts a position in geodetic coordinates into an ECEF frame.
+    """Convert geodetic coordinates (WGS84) to ECEF coordinates.
+    
+    Converts geodetic latitude, longitude, and altitude to Earth-Centered
+    Earth-Fixed (ECEF) Cartesian coordinates using WGS84 ellipsoid.
+    
     Args:
-        lat (float64) : latitude of the position [deg]
-        lon (float64) : longitude of the position [deg]
-        alt (float64) : geometric altitude of the position [m]
+        lat (float64): Geodetic latitude [deg]
+        lon (float64): Geodetic longitude [deg]
+        alt (float64): Geometric altitude above ellipsoid [m]
+    
     Returns:
-        ndarray : The position vector of the input position in
-        ECEF frame.
+        ndarray: Position vector [x, y, z] in ECEF frame [m]
     """
 
     a = 6378137.0
@@ -154,16 +237,22 @@ def geodetic2ecef(lat, lon, alt):
 
 
 def ecef2geodetic_sphere(x, y, z):
-    """Converts a position in ECEF frame into a spherical coordinates.
-    This function is DEPRECATED.
+    """Convert ECEF position to spherical coordinates (DEPRECATED).
+    
+    Converts Earth-Centered Earth-Fixed coordinates to spherical geodetic
+    coordinates using a spherical Earth model. Use ecef2geodetic() for
+    accurate WGS84 ellipsoid conversion.
+    
     Args:
-        x (float64) : X-coordinate of the position [m]
-        y (float64) : Y-coordinate of the position [m]
-        z (float64) : Z-coordinate of the position [m]
+        x (float64): X-coordinate in ECEF frame [m]
+        y (float64): Y-coordinate in ECEF frame [m]
+        z (float64): Z-coordinate in ECEF frame [m]
+    
     Returns:
-        ndarray : The combination of latitude [deg], longitude [deg]
-        and altitude [m] of the input position in spherical
-        coordinates.
+        ndarray: [latitude, longitude, altitude] in spherical coordinates [deg, deg, m]
+    
+    Note:
+        DEPRECATED - Use ecef2geodetic() for WGS84 ellipsoid accuracy
     """
     r_Earth = 6378137.0
     lat = degrees(atan2(z, sqrt(x**2 + y**2)))
@@ -173,15 +262,22 @@ def ecef2geodetic_sphere(x, y, z):
 
 
 def geodetic2ecef_sphere(lat, lon, alt):
-    """Converts a position in spherical coordinates into an ECEF frame.
-    This function is DEPRECATED.
+    """Convert spherical coordinates to ECEF position (DEPRECATED).
+    
+    Converts spherical geodetic coordinates to Earth-Centered Earth-Fixed
+    coordinates using a spherical Earth model. Use geodetic2ecef() for
+    accurate WGS84 ellipsoid conversion.
+    
     Args:
-        lat (float64) : latitude of the position [deg]
-        lon (float64) : longitude of the position [deg]
-        alt (float64) : geometric altitude of the position [m]
+        lat (float64): Latitude [deg]
+        lon (float64): Longitude [deg]
+        alt (float64): Geometric altitude above sphere [m]
+    
     Returns:
-        ndarray : The position vector of the input position in ECEF
-        frame.
+        ndarray: Position vector [x, y, z] in ECEF frame [m]
+    
+    Note:
+        DEPRECATED - Use geodetic2ecef() for WGS84 ellipsoid accuracy
     """
 
     r_Earth = 6378137.0
@@ -192,14 +288,17 @@ def geodetic2ecef_sphere(lat, lon, alt):
 
 
 def ecef2eci(xyz_in, t):
-    """Converts a position in ECEF coordinates into an ECI frame.
+    """Convert position from ECEF to ECI frame.
+    
+    Transforms position vector from Earth-Centered Earth-Fixed (ECEF) frame
+    to Earth-Centered Inertial (ECI) frame using Earth rotation rate.
+    
     Args:
-        xyz_int (ndarray) : position vector in the ECEF frame
-        t (float64) : time from the epoch (the time when the ECEF
-        frame and the ECI frame coincides)
+        xyz_in (ndarray): Position vector in ECEF frame [m]
+        t (float64): Time from epoch when ECEF and ECI frames coincide [s]
+    
     Returns:
-        ndarray : The position vector of the input position in the
-        ECI frame.
+        ndarray: Position vector in ECI frame [m]
     """
 
     omega_earth_rps = 7.2921151467e-5
@@ -215,14 +314,17 @@ def ecef2eci(xyz_in, t):
 
 
 def eci2ecef(xyz_in, t):
-    """Converts a position in ECI coordinates into an ECEF frame.
+    """Convert position from ECI to ECEF frame.
+    
+    Transforms position vector from Earth-Centered Inertial (ECI) frame
+    to Earth-Centered Earth-Fixed (ECEF) frame using Earth rotation rate.
+    
     Args:
-        xyz_int (ndarray) : position vector in the ECI frame
-        t (float64) : time from the epoch (the time when the ECEF
-        frame and the ECI frame coincides)
+        xyz_in (ndarray): Position vector in ECI frame [m]
+        t (float64): Time from epoch when ECEF and ECI frames coincide [s]
+    
     Returns:
-        ndarray : The position vector of the input position in the
-        ECEF frame.
+        ndarray: Position vector in ECEF frame [m]
     """
 
     omega_earth_rps = 7.2921151467e-5
@@ -238,15 +340,18 @@ def eci2ecef(xyz_in, t):
 
 
 def vel_ecef2eci(vel_in, pos_in, t):
-    """Converts a ground velocity vector in ECEF coordinates into
-    an inertial velocity vector in ECI frame.
+    """Convert ground velocity from ECEF to inertial velocity in ECI frame.
+    
+    Transforms ground-relative velocity in ECEF frame to inertial velocity
+    in ECI frame, accounting for Earth's rotation.
+    
     Args:
-        vel_in (ndarray) : ground velocity vector in the ECEF frame
-        pos_in (ndarray) : position vector in the ECEF frame
-        t (float64) : time from the epoch (the time when the ECEF
-        frame and the ECI frame coincides)
+        vel_in (ndarray): Ground velocity vector in ECEF frame [m/s]
+        pos_in (ndarray): Position vector in ECEF frame [m]
+        t (float64): Time from epoch when ECEF and ECI frames coincide [s]
+    
     Returns:
-        ndarray : The inertial velocity vector in the ECI frame.
+        ndarray: Inertial velocity vector in ECI frame [m/s]
     """
 
     omega_earth_rps = 7.2921151467e-5

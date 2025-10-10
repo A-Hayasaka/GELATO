@@ -23,6 +23,29 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Finite Difference Jacobian Module
+==================================
+
+Module for calculating Jacobian matrices using finite difference method.
+
+This module numerically calculates Jacobian matrices using finite difference
+method (forward difference) for constraint functions where analytical gradient
+calculation is difficult.
+
+Note:
+    * This method has high computational cost, mainly used for debugging and verification
+    * Analytical gradients are recommended for production optimization
+
+Main Features:
+    * Calculate Jacobian using forward difference method
+    * Numerically calculate partial derivatives for each variable
+    * Dense matrix format without using sparse matrices
+
+Functions:
+    jac_fd: Calculate Jacobian matrix using finite difference method
+"""
+
 import numpy as np
 
 

@@ -23,6 +23,26 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Result Output Module
+=====================
+
+Module for outputting trajectory optimization calculation results in CSV format.
+
+This module converts results obtained from the optimization solver into a
+human-readable format and saves them as CSV files.
+
+Main Features:
+    * Convert state variables from optimization results to physical quantities
+    * Calculate position, velocity, attitude, mass, etc. at each time
+    * Calculate aerodynamic parameters (dynamic pressure, Mach number, heating rate)
+    * Calculate impact point (IIP)
+    * Organize results as DataFrame and output to CSV
+
+Functions:
+    output_result: Convert optimization results to DataFrame
+"""
+
 import numpy as np
 from numpy.linalg import norm
 from math import atan2, asin, degrees

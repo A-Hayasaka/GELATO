@@ -23,6 +23,29 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Dynamics Module
+===============
+
+Module for defining rocket equations of motion.
+
+This module implements rocket equations of motion in 6 degrees of freedom
+(position, velocity, attitude), considering thrust, aerodynamic drag, and gravity.
+
+Main Features:
+    * Calculate time derivative of velocity (acceleration)
+    * Equations of motion with aerodynamics
+    * Equations of motion without aerodynamics (vacuum)
+    * Time derivative of attitude using quaternions
+    * Time derivative of mass (propellant consumption)
+
+Functions:
+    dynamics_velocity: Velocity equations of motion (with aerodynamics)
+    dynamics_velocity_NoAir: Velocity equations of motion (without aerodynamics)
+    dynamics_quaternion: Attitude equations of motion
+    dynamics_mass: Mass equations of motion
+"""
+
 from numba import jit
 import numpy as np
 from numpy.linalg import norm
@@ -48,7 +71,26 @@ from .utils import wind_ned
 def dynamics_velocity(
     mass_e, pos_eci_e, vel_eci_e, quat_eci2body, t, param, wind_table, CA_table, units
 ):
-    """Equation of motion of velocity."""
+    """Calculate time derivative of velocity (acceleration) with aerodynamics.
+    
+    Computes acceleration in ECI frame considering thrust, gravity, and
+    aerodynamic forces (drag). Includes atmospheric density, pressure, wind,
+    and Mach number effects.
+    
+    Args:
+        mass_e (ndarray): Mass array (scaled) [kg]
+        pos_eci_e (ndarray): Position in ECI frame (scaled) [m]
+        vel_eci_e (ndarray): Velocity in ECI frame (scaled) [m/s]
+        quat_eci2body (ndarray): Quaternion from ECI to body frame
+        t (ndarray): Time array [s]
+        param (ndarray): Vehicle parameters [thrust, Isp, area, etc.]
+        wind_table (ndarray): Wind velocity lookup table
+        CA_table (ndarray): Axial force coefficient vs Mach number
+        units (ndarray): Scaling factors for mass, position, velocity
+    
+    Returns:
+        ndarray: Acceleration in ECI frame (scaled) [m/s²]
+    """
 
     mass = mass_e * units[0]
     pos_eci = pos_eci_e * units[1]
@@ -87,7 +129,22 @@ def dynamics_velocity(
 
 
 def dynamics_velocity_NoAir(mass_e, pos_eci_e, quat_eci2body, param, units):
-    """Equation of motion of velocity."""
+    """Calculate time derivative of velocity (acceleration) without aerodynamics.
+    
+    Computes acceleration in ECI frame considering only thrust and gravity,
+    without aerodynamic forces. Used for vacuum flight or when aerodynamics
+    are negligible.
+    
+    Args:
+        mass_e (ndarray): Mass array (scaled) [kg]
+        pos_eci_e (ndarray): Position in ECI frame (scaled) [m]
+        quat_eci2body (ndarray): Quaternion from ECI to body frame
+        param (ndarray): Vehicle parameters [thrust, Isp, area, etc.]
+        units (ndarray): Scaling factors for mass, position, velocity
+    
+    Returns:
+        ndarray: Acceleration in ECI frame (scaled) [m/s²]
+    """
 
     mass = mass_e * units[0]
     pos_eci = pos_eci_e * units[1]
@@ -108,7 +165,19 @@ def dynamics_velocity_NoAir(mass_e, pos_eci_e, quat_eci2body, param, units):
 
 
 def dynamics_quaternion(quat_eci2body, u_e, unit_u):
-    """Equation of motion of quaternion."""
+    """Calculate time derivative of attitude quaternion.
+    
+    Computes the rate of change of quaternion based on angular velocity
+    using the kinematic differential equation: dq/dt = 0.5 * q ⊗ ω
+    
+    Args:
+        quat_eci2body (ndarray): Quaternion from ECI to body frame
+        u_e (ndarray): Angular velocity control input (scaled) [deg/s]
+        unit_u (float): Scaling factor for angular velocity
+    
+    Returns:
+        ndarray: Time derivative of quaternion
+    """
 
     u = u_e * unit_u
 

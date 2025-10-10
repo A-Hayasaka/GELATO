@@ -23,6 +23,28 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Initial, Terminal, and Knot Constraints Module
+===============================================
+
+Module for defining boundary conditions and constraints at knot points for optimization problems.
+
+This module defines initial conditions, terminal conditions, and continuity/connection
+conditions at knot points between phases for trajectory optimization problems.
+
+Main Features:
+    * Equality constraints for initial conditions (position, velocity, attitude, mass)
+    * Equality constraints for terminal conditions (orbital elements, velocity, altitude, etc.)
+    * Continuity constraints for state variables at knot points
+    * Mass change constraints during stage separation
+    * Constraints on orbital elements (semi-major axis, eccentricity, inclination, etc.)
+
+Constraint Functions:
+    equality_initial: Equality constraints for initial conditions
+    equality_terminal: Equality constraints for terminal conditions
+    equality_knot: Continuity constraints at knot points
+"""
+
 import numpy as np
 from math import cos, radians
 from .coordinate_c import (

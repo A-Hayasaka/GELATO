@@ -23,6 +23,26 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+User Constraints Module
+========================
+
+Module for integrating user-defined constraint conditions.
+
+This module incorporates user-defined equality and inequality constraints
+described in user_constraints.py into optimization problems.
+
+Main Features:
+    * Integration of user-defined equality constraints
+    * Integration of user-defined inequality constraints
+    * Jacobian calculation using finite difference method
+    * Interface provision for custom constraints
+
+Functions:
+    equality_user_wrapper: Wrapper for user-defined equality constraints
+    inequality_user_wrapper: Wrapper for user-defined inequality constraints
+"""
+
 # constraints_u.py
 # constraints about user conditions
 
