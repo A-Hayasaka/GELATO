@@ -89,13 +89,10 @@
     }
   },
 
-  "IPOPT_": {
+  "IPOPT": {
     "linear_solver": "mumps",
     "tol": 1.0e-6,
     "acceptable_tol": 1.0e-4,
     "max_iter": 2000
-  },
-
-  "SNOPT": {}
-
+  }
 }
