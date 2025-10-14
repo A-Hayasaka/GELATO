@@ -23,3 +23,7 @@ doxygen:
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile doxygen
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+	@if [ "$@" = "html" ]; then \
+		echo "Copying .nojekyll for GitHub Pages..."; \
+		cp .nojekyll $(BUILDDIR)/html/.nojekyll; \
+	fi

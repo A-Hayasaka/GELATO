@@ -71,3 +71,23 @@ breathe_projects = {
     "GELATO_CPP": "_build/doxygen/xml"
 }
 breathe_default_project = "GELATO_CPP"
+
+# -- GitHub Pages configuration ----------------------------------------------
+# Base URL for GitHub Pages (will be set by sphinx.ext.githubpages)
+html_baseurl = 'https://istellartech.github.io/GELATO/'
+html_context = {
+    "display_github": True,
+    "github_user": "istellartech",
+    "github_repo": "GELATO",
+    "github_version": "master",
+    "conf_py_path": "/docs/",
+}
+
+# Additional HTML theme options
+html_theme_options = {
+    'navigation_depth': 4,
+    'collapse_navigation': False,
+    'sticky_navigation': True,
+    'includehidden': True,
+    'titles_only': False
+}
