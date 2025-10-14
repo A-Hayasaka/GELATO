@@ -61,7 +61,25 @@ from .coordinate_c import (
 
 
 def equality_init(xdict, pdict, unitdict, condition):
-    """Equality constraint about initial conditions."""
+    """Equality constraint for initial conditions at trajectory start.
+    
+    Enforces that the initial state (mass, position, velocity, quaternion) matches 
+    the specified initial conditions from the configuration.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables:
+            - 'mass': Array of mass values
+            - 'position': Flattened array of position vectors (reshape to (N,3))
+            - 'velocity': Flattened array of velocity vectors (reshape to (N,3))
+            - 'quaternion': Flattened array of quaternions (reshape to (N,4))
+        pdict (dict): Dictionary containing optimization parameters
+        unitdict (dict): Dictionary of unit scaling factors for normalization
+        condition (dict): Configuration dictionary with 'init' and 'OptimizationMode'
+    
+    Returns:
+        numpy.ndarray: Concatenated array of constraint violations (should be zero at optimum).
+            Length depends on OptimizationMode (10 or 11 constraints).
+    """
 
     con = []
     mass_ = xdict["mass"]
@@ -80,7 +98,22 @@ def equality_init(xdict, pdict, unitdict, condition):
 
 
 def equality_jac_init(xdict, pdict, unitdict, condition):
-    """Jacobian of equality_init."""
+    """Compute Jacobian matrix of equality_init constraint.
+    
+    Calculates the partial derivatives of initial condition constraints with respect 
+    to all state variables. Returns sparse Jacobian in COO format.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables
+        pdict (dict): Dictionary containing optimization parameters with 'M' (total nodes)
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary with 'OptimizationMode'
+    
+    Returns:
+        dict: Jacobian matrices in COO sparse format for each state variable:
+            - Keys: 'position', 'velocity', 'quaternion', and optionally 'mass'
+            - Values: Dict with 'coo' (row, col, data) and 'shape' (nRow, nCol)
+    """
 
     jac = {}
 
@@ -144,7 +177,20 @@ def equality_jac_init(xdict, pdict, unitdict, condition):
 
 
 def equality_time(xdict, pdict, unitdict, condition):
-    """Equality constraint about time of knots."""
+    """Equality constraint fixing event times at specified knot points.
+    
+    Enforces that event times match predefined reference values when specified
+    in the configuration. Forces initial time and relative timing between events.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables including 't' (event times)
+        pdict (dict): Dictionary with 'params' (section parameters) and 'event_index'
+        unitdict (dict): Dictionary of unit scaling factors including 't' (time unit)
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        numpy.ndarray: Constraint values (equals 0 when satisfied)
+    """
 
     con = []
     unit_t = unitdict["t"]
@@ -168,7 +214,21 @@ def equality_time(xdict, pdict, unitdict, condition):
 
 
 def equality_jac_time(xdict, pdict, unitdict, condition):
-    """Jacobian of equality_time."""
+    """Compute Jacobian matrix of equality_time constraint.
+    
+    Calculates the partial derivatives of time constraints with respect to 
+    event times (knot points).
+    
+    Args:
+        xdict (dict): Dictionary containing state variables including 't' (event times)
+        pdict (dict): Dictionary containing parameters with 'event_index' and 'num_sections'
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        dict: Jacobian matrix in COO sparse format with key 't', containing
+            'coo' (row, col, data) and 'shape' (nRow, nCol).
+    """
 
     jac = {}
 
@@ -194,7 +254,25 @@ def equality_jac_time(xdict, pdict, unitdict, condition):
 
 
 def equality_knot_LGR(xdict, pdict, unitdict, condition):
-    """Equality constraint about knotting conditions."""
+    """Equality constraint for state continuity at knot points (LGR method).
+    
+    Enforces continuity of state variables (mass, position, velocity, quaternion) 
+    at the boundaries between trajectory sections for Legendre-Gauss-Radau (LGR) 
+    pseudospectral method. Handles mass discontinuities at stage separations.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables:
+            - 'mass': Array of mass values
+            - 'position', 'velocity': Flattened arrays reshaped to (N,3)
+            - 'quaternion': Flattened array reshaped to (N,4)
+        pdict (dict): Dictionary with 'ps_params' for section indexing, 'RocketStage' for staging info
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        numpy.ndarray or None: Concatenated constraint violations at all knot points,
+            or None if there are no knot points to constrain.
+    """
 
     con = []
 
@@ -268,7 +346,21 @@ def equality_knot_LGR(xdict, pdict, unitdict, condition):
 
 
 def equality_jac_knot_LGR(xdict, pdict, unitdict, condition):
-    """Jacobian of equality_knot."""
+    """Compute Jacobian matrix of equality_knot_LGR constraint.
+    
+    Calculates the partial derivatives of knot point continuity constraints with 
+    respect to state variables at section boundaries. Returns sparse Jacobian in COO format.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables
+        pdict (dict): Dictionary with section parameters, 'ps_params', and 'RocketStage'
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        dict or None: Jacobian matrices in COO sparse format for 'mass', 'position',
+            'velocity', 'quaternion', or None if no knot constraints exist.
+    """
 
     jac = {}
 
@@ -349,7 +441,24 @@ def equality_jac_knot_LGR(xdict, pdict, unitdict, condition):
 
 
 def equality_6DoF_LGR_terminal(xdict, pdict, unitdict, condition):
-    """Equality constraint about terminal condition."""
+    """Equality constraint for terminal (final) orbital conditions.
+    
+    Enforces terminal constraints such as target perigee/apogee altitude, inclination,
+    right ascension of ascending node (RAAN), and argument of perigee based on the
+    final state of the trajectory.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables with final position and velocity
+        pdict (dict): Dictionary containing optimization parameters
+        unitdict (dict): Dictionary of unit scaling factors for position and velocity
+        condition (dict): Configuration dictionary with terminal conditions:
+            - 'altitude_perigee', 'altitude_apogee': Target orbit altitudes [m]
+            - 'inclination', 'arg_perigee', 'RAAN': Orbital elements [degrees or rad]
+    
+    Returns:
+        numpy.ndarray or None: Array of terminal constraint violations, or None if 
+            no terminal constraints are specified.
+    """
 
     con = []
 
@@ -395,7 +504,21 @@ def equality_6DoF_LGR_terminal(xdict, pdict, unitdict, condition):
 
 
 def equality_jac_6DoF_LGR_terminal(xdict, pdict, unitdict, condition):
-    """Jacobian of equality_terminal."""
+    """Compute Jacobian matrix of equality_6DoF_LGR_terminal constraint.
+    
+    Calculates the partial derivatives of terminal orbital condition constraints 
+    with respect to final position and velocity using finite differences.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables
+        pdict (dict): Dictionary with 'dx' (finite difference step size) and 'M' (total nodes)
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration with terminal orbital constraints
+    
+    Returns:
+        dict or None: Jacobian matrices in COO sparse format for 'position' and 
+            'velocity', or None if no terminal constraints exist.
+    """
 
     jac = {}
     dx = pdict["dx"]
@@ -428,7 +551,20 @@ def equality_jac_6DoF_LGR_terminal(xdict, pdict, unitdict, condition):
 
 
 def inequality_time(xdict, pdict, unitdict, condition):
-    """Inequality constraint about time at knots."""
+    """Inequality constraint ensuring forward time progression at knot points.
+    
+    Enforces that event times are monotonically increasing (later events occur after earlier ones)
+    for sections where time is not explicitly fixed by the configuration.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables including 't' (event times)
+        pdict (dict): Dictionary with 'params' (section parameters) and 'event_index'
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        numpy.ndarray: Constraint values (>= 0 when satisfied, ensuring t[i+1] >= t[i])
+    """
 
     con = []
     t_normal = xdict["t"]
@@ -444,7 +580,19 @@ def inequality_time(xdict, pdict, unitdict, condition):
 
 
 def inequality_jac_time(xdict, pdict, unitdict, condition):
-    """Jacobian of inequality_time."""
+    """Jacobian of the time ordering inequality constraint.
+    
+    Computes the derivatives of inequality_time with respect to event times.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables including 't' (event times)
+        pdict (dict): Dictionary with 'params' (section parameters) and 'event_index'
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        dict: Jacobian in COO sparse format with keys 'data', 'row', 'col'
+    """
 
     jac = {}
 

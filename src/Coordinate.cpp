@@ -23,6 +23,11 @@
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+/**
+ * @file Coordinate.cpp
+ * @brief Implementation of coordinate transformation functions
+ */
+
 #include "Coordinate.hpp"
 
 #include <cmath>

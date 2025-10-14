@@ -23,6 +23,16 @@
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+/**
+ * @file pybind_USStandardAtmosphere.cpp
+ * @brief PyBind11 module definition for U.S. Standard Atmosphere calculations
+ * 
+ * This file creates the Python module 'USStandardAtmosphere_c' which exposes
+ * C++ atmospheric property calculation functions to Python. The module
+ * implements the U.S. Standard Atmosphere 1976 model for calculating
+ * temperature, pressure, density, and speed of sound at various altitudes.
+ */
+
 #include "wrapper_air.hpp"
 
 PYBIND11_MODULE(USStandardAtmosphere_c, m) {

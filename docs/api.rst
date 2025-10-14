@@ -27,18 +27,6 @@ Constraint Modules
    api/con_user
    api/con_waypoint
 
-Physics and Mathematics
-------------------------
-
-.. toctree::
-   :maxdepth: 1
-
-   api/dynamics
-   api/coordinate
-   api/USStandardAtmosphere
-   api/IIP
-   api/downrange
-
 Optimization
 ------------
 
@@ -50,10 +38,32 @@ Optimization
    api/cost_gradient
    api/jac_fd
 
-Utilities
----------
+Legacy Code (Reference Only)
+-----------------------------
+
+.. warning::
+   **Deprecated Python Implementations**
+   
+   All modules in this section have been moved to ``lib/_LEGACYCODE/`` and are 
+   **no longer used** in the codebase. They have been replaced by optimized C++ 
+   extensions for performance:
+   
+   - ``lib._LEGACYCODE.dynamics`` → Use ``lib.dynamics_c``
+   - ``lib._LEGACYCODE.coordinate`` → Use ``lib.coordinate_c``
+   - ``lib._LEGACYCODE.USStandardAtmosphere`` → Use ``lib.USStandardAtmosphere_c``
+   - ``lib._LEGACYCODE.IIP`` → Use ``lib.IIP_c``
+   - ``lib._LEGACYCODE.downrange`` → Use ``lib.coordinate_c`` (distance_vincenty)
+   - ``lib._LEGACYCODE.utils`` → Use ``lib.utils_c``
+   
+   These modules are kept for reference purposes only to understand the original 
+   Python implementation.
 
 .. toctree::
    :maxdepth: 1
 
+   api/dynamics
+   api/coordinate
+   api/USStandardAtmosphere
+   api/IIP
+   api/downrange
    api/utils

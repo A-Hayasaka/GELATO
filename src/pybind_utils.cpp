@@ -23,6 +23,19 @@
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+/**
+ * @file pybind_utils.cpp
+ * @brief PyBind11 module definition for utility functions
+ * 
+ * This file creates the Python module 'utils_c' which exposes C++
+ * utility functions to Python. The module includes:
+ * - Distance calculations (Haversine formula)
+ * - Wind model functions
+ * - Angle of attack calculations
+ * - Dynamic pressure calculations
+ * - Aerodynamic parameter calculations
+ */
+
 #include "wrapper_utils.hpp"
 
 PYBIND11_MODULE(utils_c, m) {

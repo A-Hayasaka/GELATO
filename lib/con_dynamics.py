@@ -99,7 +99,22 @@ def equality_dynamics_mass(xdict, pdict, unitdict, condition):
 
 
 def equality_jac_dynamics_mass(xdict, pdict, unitdict, condition):
-    """Jacobian of equality_dynamics_mass."""
+    """
+    Compute Jacobian matrix of equality_dynamics_mass constraint.
+    
+    Calculates the partial derivatives of mass dynamics constraints with respect 
+    to mass and time using pseudospectral differentiation matrices.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables
+        pdict (dict): Dictionary with section parameters, 'ps_params', and dimensions
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        dict: Jacobian matrices in COO sparse format for 'mass' and 't', each containing
+            'coo' (row, col, data) and 'shape' (nRow, nCol).
+    """
 
     jac = {}
 
@@ -201,7 +216,21 @@ def equality_dynamics_position(xdict, pdict, unitdict, condition):
 
 
 def equality_jac_dynamics_position(xdict, pdict, unitdict, condition):
-    """Jacobian of equality_dynamics_position."""
+    """Compute Jacobian matrix of equality_dynamics_position constraint.
+    
+    Calculates the partial derivatives of position dynamics constraints with respect 
+    to position, velocity, and time using pseudospectral differentiation matrices.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('position', 'velocity', 't')
+        pdict (dict): Dictionary with section parameters, 'ps_params', and dimensions
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        dict: Jacobian matrices in COO sparse format for 'position', 'velocity', and 't',
+            each containing 'coo' (row, col, data) and 'shape' (nRow, nCol).
+    """
 
     jac = {}
 
@@ -351,7 +380,22 @@ def equality_dynamics_velocity(xdict, pdict, unitdict, condition):
 
 
 def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
-    """Jacobian of equality_dynamics_velocity."""
+    """Compute Jacobian matrix of equality_dynamics_velocity constraint.
+    
+    Calculates the partial derivatives of velocity dynamics constraints with respect 
+    to mass, position, velocity, quaternion (attitude), and time. Includes effects
+    of thrust, gravity, and aerodynamic forces.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('mass', 'position', 'velocity', 'quaternion', 't')
+        pdict (dict): Dictionary with section parameters, 'ps_params', dimensions, and 'dx' (finite difference step)
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary including aerodynamic data
+    
+    Returns:
+        dict: Jacobian matrices in COO sparse format for 'mass', 'position', 'velocity', 
+            'quaternion', and 't', each containing 'coo' (row, col, data) and 'shape' (nRow, nCol).
+    """
 
     jac = {}
     dx = pdict["dx"]
@@ -404,6 +448,7 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
         submat_vel[2::3, 2::3] = pdict["ps_params"].D(i)
 
         def dynamics(mass, pos, vel, quat, t):
+            """Compute velocity dynamics with or without aerodynamics."""
             if param[2] == 0.0:
                 return dynamics_velocity_NoAir(mass, pos, quat, param, units)
             else:
@@ -609,7 +654,22 @@ def equality_dynamics_quaternion(xdict, pdict, unitdict, condition):
 
 
 def equality_jac_dynamics_quaternion(xdict, pdict, unitdict, condition):
-    """Jacobian of equality_dynamics_quaternion."""
+    """Compute Jacobian matrix of equality_dynamics_quaternion constraint.
+    
+    Calculates the partial derivatives of quaternion (attitude) dynamics constraints 
+    with respect to quaternion and time. Uses quaternion kinematic equations with 
+    angular velocity control inputs.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('quaternion', 't')
+        pdict (dict): Dictionary with section parameters, 'ps_params', dimensions, and attitude control rates
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        dict: Jacobian matrices in COO sparse format for 'quaternion' and 't',
+            each containing 'coo' (row, col, data) and 'shape' (nRow, nCol).
+    """
 
     jac = {}
     dx = pdict["dx"]

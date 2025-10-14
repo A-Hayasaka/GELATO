@@ -86,7 +86,22 @@ def dynamic_pressure_dimless(pos_eci_e, vel_eci_e, t_e, wind, units):
 
 
 def dynamic_pressure_array_dimless(pos_eci_e, vel_eci_e, t_e, wind, units):
-    """Returns array of dynamic pressure for each state values."""
+    """
+    Calculate dimensionless dynamic pressure array for trajectory points.
+    
+    Computes dynamic pressure (0.5 * ρ * v²) at each state point and normalizes
+    by the characteristic pressure unit for constraint evaluation.
+    
+    Args:
+        pos_eci_e (numpy.ndarray): Normalized position array in ECI frame (n, 3)
+        vel_eci_e (numpy.ndarray): Normalized velocity array in ECI frame (n, 3)
+        t_e (numpy.ndarray): Normalized time array (n,)
+        wind (numpy.ndarray): Wind profile data table
+        units (tuple): Unit scaling factors (pos_unit, vel_unit, time_unit, pressure_unit)
+    
+    Returns:
+        numpy.ndarray: Dimensionless dynamic pressure at each point (n,)
+    """
     pos_eci = pos_eci_e * units[0]
     vel_eci = vel_eci_e * units[1]
     t = t_e * units[2]
@@ -117,7 +132,23 @@ def angle_of_attack_all_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
 
 
 def angle_of_attack_all_array_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
-    """Returns array of angle of attack for each state values."""
+    """
+    Calculate dimensionless total angle of attack array for trajectory points.
+    
+    Computes total angle of attack (magnitude combining pitch and yaw components)
+    at each state point and normalizes by maximum allowable angle for constraint evaluation.
+    
+    Args:
+        pos_eci_e (numpy.ndarray): Normalized position array in ECI frame (n, 3)
+        vel_eci_e (numpy.ndarray): Normalized velocity array in ECI frame (n, 3)
+        quat (numpy.ndarray): Attitude quaternion array (n, 4)
+        t_e (numpy.ndarray): Normalized time array (n,)
+        wind (numpy.ndarray): Wind profile data table
+        units (tuple): Unit scaling factors (pos_unit, vel_unit, time_unit, alpha_max)
+    
+    Returns:
+        numpy.ndarray: Dimensionless angle of attack at each point (n,)
+    """
     pos_eci = pos_eci_e * units[0]
     vel_eci = vel_eci_e * units[1]
     t = t_e * units[2]
@@ -148,7 +179,24 @@ def q_alpha_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
 
 
 def q_alpha_array_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
-    """Returns array of Q-alpha for each state values."""
+    """
+    Calculate dimensionless Q-alpha array for trajectory points.
+    
+    Computes Q-alpha (dynamic pressure × angle of attack) at each state point
+    and normalizes by maximum allowable value. This parameter is critical for
+    assessing aerodynamic structural loads during flight.
+    
+    Args:
+        pos_eci_e (numpy.ndarray): Normalized position array in ECI frame (n, 3)
+        vel_eci_e (numpy.ndarray): Normalized velocity array in ECI frame (n, 3)
+        quat (numpy.ndarray): Attitude quaternion array (n, 4)
+        t_e (numpy.ndarray): Normalized time array (n,)
+        wind (numpy.ndarray): Wind profile data table
+        units (tuple): Unit scaling factors (pos_unit, vel_unit, time_unit, q_alpha_max)
+    
+    Returns:
+        numpy.ndarray: Dimensionless Q-alpha at each point (n,)
+    """
     pos_eci = pos_eci_e * units[0]
     vel_eci = vel_eci_e * units[1]
     t = t_e * units[2]
@@ -156,7 +204,22 @@ def q_alpha_array_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
 
 
 def inequality_max_alpha(xdict, pdict, unitdict, condition):
-    """Inequality constraint about maximum angle of attack."""
+    """
+    Inequality constraint for maximum angle of attack.
+    
+    Enforces that angle of attack remains below specified maximum value
+    throughout flight or during specified trajectory sections. Constraint
+    is formulated as: 1 - α/α_max ≥ 0.
+    
+    Args:
+        xdict (dict): State variables (position, velocity, quaternion, time)
+        pdict (dict): Problem parameters (sections, pseudospectral params, wind)
+        unitdict (dict): Unit scaling factors
+        condition (dict): Constraint conditions including 'AOA_max' specifications
+    
+    Returns:
+        numpy.ndarray: Constraint values (should be ≥ 0)
+    """
 
     con = []
 
@@ -214,7 +277,20 @@ def inequality_max_alpha(xdict, pdict, unitdict, condition):
 
 
 def inequality_max_q(xdict, pdict, unitdict, condition):
-    """Inequality constraint about maximum dynamic pressure."""
+    """Inequality constraint enforcing maximum dynamic pressure limits.
+    
+    Constrains dynamic pressure Q = 0.5 * ρ * V² to remain below specified maximum values
+    during specified flight phases.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('position', 'velocity', 't')
+        pdict (dict): Dictionary with problem parameters including wind table
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary with 'dynamic_pressure_max' specifications
+    
+    Returns:
+        ndarray or None: Constraint values (>= 0 when satisfied), or None if no constraints
+    """
 
     con = []
 
@@ -263,8 +339,25 @@ def inequality_max_q(xdict, pdict, unitdict, condition):
 
 
 def inequality_max_qalpha(xdict, pdict, unitdict, condition):
-    """Inequality constraint about maximum Q-alpha
-    (product of angle of attack and dynamic pressure).
+    """Inequality constraint enforcing maximum Q-alpha limit.
+    
+    Q-alpha is the product of dynamic pressure and angle of attack, representing
+    combined aerothermal and structural loading. This constraint ensures the vehicle
+    stays within safe aerodynamic heating and load limits during flight.
+    
+    The constraint can be applied to all collocation points or only the initial point
+    of specified trajectory sections.
+    
+    Args:
+        xdict (dict): Dictionary with 'position', 'velocity', 'quaternion', 't' state variables
+        pdict (dict): Dictionary with 'num_sections', 'params', 'ps_params', 'wind_table'
+        unitdict (dict): Dictionary with 'position', 'velocity', 't' unit scalings
+        condition (dict): Configuration with 'Q_alpha_max' limits per section
+            - 'value': Maximum Q-alpha limit in [Pa·rad]
+            - 'range': 'all' (all points) or 'initial' (section start only)
+    
+    Returns:
+        numpy.ndarray or None: Constraint values (>= 0 when satisfied), or None if no constraints
     """
 
     con = []
@@ -318,7 +411,13 @@ def inequality_max_qalpha(xdict, pdict, unitdict, condition):
 
 
 def inequality_length_max_alpha(xdict, pdict, unitdict, condition):
-    """Length of inequality_max_alpha."""
+    """Calculate the number of maximum angle-of-attack constraints.
+    
+    Determines constraint vector length for Jacobian matrix sizing.
+    
+    Returns:
+        int: Total number of AOA constraint equations
+    """
     res = 0
 
     num_sections = pdict["num_sections"]
@@ -338,7 +437,13 @@ def inequality_length_max_alpha(xdict, pdict, unitdict, condition):
 
 
 def inequality_length_max_q(xdict, pdict, unitdict, condition):
-    """Length of inequality_max_q."""
+    """Calculate the number of maximum dynamic pressure constraints.
+    
+    Determines constraint vector length for Jacobian matrix sizing.
+    
+    Returns:
+        int: Total number of dynamic pressure constraint equations
+    """
     res = 0
 
     num_sections = pdict["num_sections"]
@@ -358,7 +463,14 @@ def inequality_length_max_q(xdict, pdict, unitdict, condition):
 
 
 def inequality_length_max_qalpha(xdict, pdict, unitdict, condition):
-    """Length of inequality_max_qalpha."""
+    """Calculate the number of maximum Q-alpha constraints.
+    
+    Determines constraint vector length for Jacobian matrix sizing.
+    Q-alpha = dynamic pressure × angle of attack.
+    
+    Returns:
+        int: Total number of Q-alpha constraint equations
+    """
     res = 0
 
     num_sections = pdict["num_sections"]
@@ -380,7 +492,23 @@ def inequality_length_max_qalpha(xdict, pdict, unitdict, condition):
 def angle_of_attack_all_gradient_dimless(
     pos_eci_e, vel_eci_e, quat, to, tf, wind, units, time_nodes, dx, n
 ):
-    """Returns gradient of Q-alpha."""
+    """Compute gradient of angle of attack with respect to state variables using finite differences.
+    
+    Args:
+        pos_eci_e (numpy.ndarray): Normalized ECI position array
+        vel_eci_e (numpy.ndarray): Normalized ECI velocity array
+        quat (numpy.ndarray): Quaternion array (ECI to body frame)
+        to (float): Normalized initial time for section
+        tf (float): Normalized final time for section
+        wind (object): Wind table for atmospheric calculations
+        units (list): Unit scaling factors [position, velocity, time, dimensionless]
+        time_nodes (callable): Function to generate collocation time nodes
+        dx (float): Finite difference step size
+        n (int): Number of collocation points
+    
+    Returns:
+        dict: Gradient dictionary with keys 'position', 'velocity', 'quaternion', 'to', 'tf'
+    """
     ki = range(n)
     grad = {
         "position": np.zeros((n, 3)),
@@ -441,7 +569,19 @@ def angle_of_attack_all_gradient_dimless(
 
 
 def inequality_jac_max_alpha(xdict, pdict, unitdict, condition):
-    """Jacobian of inequality_max_alpha."""
+    """Jacobian of the maximum angle of attack inequality constraint.
+    
+    Computes derivatives of inequality_max_alpha with respect to state variables.
+    
+    Args:
+        xdict (dict): Dictionary with 'position', 'velocity', 'quaternion', 't'
+        pdict (dict): Dictionary with 'dx' (FD step), 'wind_table', 'num_sections', 'params'
+        unitdict (dict): Dictionary with 'position', 'velocity', 't' unit scalings
+        condition (dict): Configuration dictionary with alpha constraint settings
+    
+    Returns:
+        dict or None: Jacobian in COO sparse format with keys 'data', 'row', 'col', or None if no constraints
+    """
 
     jac = {}
     dx = pdict["dx"]
@@ -494,6 +634,7 @@ def inequality_jac_max_alpha(xdict, pdict, unitdict, condition):
                 nk = 1
 
             def time_nodes(t1, t2):
+                """Generate collocation time nodes for current section."""
                 return pdict["ps_params"].time_nodes(i, t1, t2)
 
             dfdx = angle_of_attack_all_gradient_dimless(
@@ -542,7 +683,22 @@ def inequality_jac_max_alpha(xdict, pdict, unitdict, condition):
 def dynamic_pressure_gradient_dimless(
     pos_eci_e, vel_eci_e, to, tf, wind, units, time_nodes, dx, n
 ):
-    """Returns gradient of dynamic pressure."""
+    """Compute gradient of dynamic pressure with respect to state variables using finite differences.
+    
+    Args:
+        pos_eci_e (numpy.ndarray): Normalized ECI position array
+        vel_eci_e (numpy.ndarray): Normalized ECI velocity array
+        to (float): Normalized initial time for section
+        tf (float): Normalized final time for section
+        wind (object): Wind table for atmospheric calculations
+        units (list): Unit scaling factors [position, velocity, time, dimensionless]
+        time_nodes (callable): Function to generate collocation time nodes
+        dx (float): Finite difference step size
+        n (int): Number of collocation points
+    
+    Returns:
+        dict: Gradient dictionary with keys 'position', 'velocity', 'to', 'tf'
+    """
     ki = range(n)
     grad = {
         "position": np.zeros((n, 3)),
@@ -585,7 +741,19 @@ def dynamic_pressure_gradient_dimless(
 
 
 def inequality_jac_max_q(xdict, pdict, unitdict, condition):
-    """Jacobian of inequality_max_q."""
+    """Jacobian of the maximum dynamic pressure inequality constraint.
+    
+    Computes derivatives of inequality_max_q with respect to state variables.
+    
+    Args:
+        xdict (dict): Dictionary with 'position', 'velocity', 't' state variables
+        pdict (dict): Dictionary with 'dx' (FD step), 'wind_table', 'num_sections', 'params'
+        unitdict (dict): Dictionary with 'position', 'velocity', 't' unit scalings
+        condition (dict): Configuration dictionary with dynamic pressure constraint settings
+    
+    Returns:
+        dict or None: Jacobian in COO sparse format with keys 'data', 'row', 'col', or None if no constraints
+    """
 
     jac = {}
     dx = pdict["dx"]
@@ -636,6 +804,7 @@ def inequality_jac_max_q(xdict, pdict, unitdict, condition):
                 nk = 1
 
             def time_nodes(t1, t2):
+                """Generate collocation time nodes for current section."""
                 return pdict["ps_params"].time_nodes(i, t1, t2)
 
             dfdx = dynamic_pressure_gradient_dimless(
@@ -677,7 +846,23 @@ def inequality_jac_max_q(xdict, pdict, unitdict, condition):
 def q_alpha_gradient_dimless(
     pos_eci_e, vel_eci_e, quat, to, tf, wind, units, time_nodes, dx, n
 ):
-    """Returns gradient of Q-alpha."""
+    """Compute gradient of Q-alpha (dynamic pressure × angle of attack) using finite differences.
+    
+    Args:
+        pos_eci_e (numpy.ndarray): Normalized ECI position array
+        vel_eci_e (numpy.ndarray): Normalized ECI velocity array
+        quat (numpy.ndarray): Quaternion array (ECI to body frame)
+        to (float): Normalized initial time for section
+        tf (float): Normalized final time for section
+        wind (object): Wind table for atmospheric calculations
+        units (list): Unit scaling factors [position, velocity, time, dimensionless]
+        time_nodes (callable): Function to generate collocation time nodes
+        dx (float): Finite difference step size
+        n (int): Number of collocation points
+    
+    Returns:
+        dict: Gradient dictionary with keys 'position', 'velocity', 'quaternion', 'to', 'tf'
+    """
     ki = range(n)
     grad = {
         "position": np.zeros((n, 3)),
@@ -728,7 +913,19 @@ def q_alpha_gradient_dimless(
 
 
 def inequality_jac_max_qalpha(xdict, pdict, unitdict, condition):
-    """Jacobian of inequality_max_qalpha."""
+    """Jacobian of the maximum Q-alpha (dynamic pressure × angle of attack) inequality constraint.
+    
+    Computes derivatives of inequality_max_qalpha with respect to state variables.
+    
+    Args:
+        xdict (dict): Dictionary with 'position', 'velocity', 'quaternion', 't' state variables
+        pdict (dict): Dictionary with 'dx' (FD step), 'wind_table', 'num_sections', 'params'
+        unitdict (dict): Dictionary with 'position', 'velocity', 't' unit scalings
+        condition (dict): Configuration dictionary with Q-alpha constraint settings
+    
+    Returns:
+        dict or None: Jacobian in COO sparse format with keys 'data', 'row', 'col', or None if no constraints
+    """
 
     jac = {}
     dx = pdict["dx"]
@@ -781,6 +978,7 @@ def inequality_jac_max_qalpha(xdict, pdict, unitdict, condition):
                 nk = 1
 
             def time_nodes(t1, t2):
+                """Generate collocation time nodes for current section."""
                 return pdict["ps_params"].time_nodes(i, t1, t2)
 
             dfdx = q_alpha_gradient_dimless(

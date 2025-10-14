@@ -3,7 +3,7 @@ SectionParameters
 
 Multi-phase trajectory optimization parameter management module.
 
-.. automodule:: SectionParameters
+.. automodule:: lib.SectionParameters
    :members:
    :undoc-members:
    :show-inheritance:

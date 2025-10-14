@@ -49,6 +49,32 @@ from numpy import tan, arcsin, arctan2, sqrt
 
 
 def posLLH_IIP_FAA(posECEF_, velECEF_, fill_na=True, n_iter=5):
+    """
+    Calculate Instantaneous Impact Point (IIP) using FAA method.
+    
+    Computes the geographic location (latitude, longitude, altitude) where the 
+    rocket would impact the Earth if thrust were terminated at the current position 
+    and velocity. Uses the Federal Aviation Administration (FAA) algorithm with 
+    iterative refinement for oblate Earth geometry.
+    
+    Args:
+        posECEF_ (numpy.ndarray): Position vector in ECEF frame [m] (3,)
+        velECEF_ (numpy.ndarray): Velocity vector in ECEF frame [m/s] (3,)
+        fill_na (bool, optional): If True, return zeros when no solution exists;
+            if False, return NaN. Default is True.
+        n_iter (int, optional): Number of iterations for convergence. Default is 5.
+    
+    Returns:
+        numpy.ndarray: IIP position as [latitude (rad), longitude (rad), altitude (m)] (3,),
+            or zeros/NaN if no solution exists (e.g., vehicle below surface or in orbit).
+    
+    Notes:
+        Based on 14 CFR Appendix-B-to-Part-420(d)(3)(v)
+
+        https://www.ecfr.gov/current/title-14/appendix-Appendix%20B%20to%20Part%20420#p-Appendix-B-to-Part-420(d)(3)(v)
+        
+        Assumes WGS84 ellipsoid: a=6378137m, f=1/298.257223563.
+    """
     a = 6378137
     mu = 3.986004418e14
     f = 1.0 / 298.257223563

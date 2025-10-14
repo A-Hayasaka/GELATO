@@ -57,32 +57,42 @@ from output_result import output_result
 
 
 def dynamics_init(x, u, t, param, zlt, wind, ca):
-    """Full equation of motion for initial guess generation.
+    """
+    Full 6-DOF equations of motion for initial guess generation.
 
-    This function computes the time derivatives of the state vector for
-    numerical integration to generate initial trajectory guesses.
+    Computes the time derivatives of the state vector (mass, position, velocity, 
+    quaternion) for numerical integration to generate initial trajectory guesses. 
+    Includes gravity, thrust, aerodynamic forces, and atmospheric effects.
 
     Args:
         x (ndarray): State vector [11 elements]
             [0]: mass [kg]
-            [1:4]: position in ECI frame [m]
-            [4:7]: inertial velocity in ECI frame [m/s]
-            [7:11]: quaternion from ECI to body frame
+            [1:4]: position in ECI frame [m] (X, Y, Z)
+            [4:7]: inertial velocity in ECI frame [m/s] (X, Y, Z)
+            [7:11]: quaternion from ECI to body frame (q0, q1, q2, q3)
         u (ndarray): Angular rates in body frame [deg/s] [roll, pitch, yaw]
-        t (float64): Time since epoch [s]
+        t (float): Time since epoch [s]
         param (ndarray): Rocket parameters [5 elements]
             [0]: thrust at vacuum [N]
             [1]: mass flow rate [kg/s]
             [2]: reference area [m^2]
             [3]: (unused)
             [4]: nozzle exit area [m^2]
-        zlt (bool): True when zero-lift turn mode is enabled
-        wind (ndarray): Wind table with columns [altitude, wind_north, wind_east]
-        ca (ndarray): Axial force coefficient table [Mach, CA]
+        zlt (bool): If True, enable zero-lift turn mode (thrust aligned with airspeed)
+        wind (ndarray): Wind table with columns [altitude(m), wind_north(m/s), wind_east(m/s)]
+        ca (ndarray): Axial force coefficient table [Mach number, CA]
 
     Returns:
-        ndarray: Time derivative of the state vector (same shape as x)
+        ndarray: Time derivative of the state vector dx/dt [11 elements]:
+            [0]: dm/dt (mass rate) [kg/s]
+            [1:4]: dr/dt (velocity) [m/s]
+            [4:7]: dv/dt (acceleration) [m/s^2]
+            [7:11]: dq/dt (quaternion rate) [1/s]
 
+    Notes:
+        Uses US Standard Atmosphere 1976 for atmospheric properties.
+        Accounts for Earth rotation in velocity transformations.
+        Aerodynamic forces based on axial coefficient and dynamic pressure.
     """
 
     mass = x[0]
@@ -141,18 +151,35 @@ def dynamics_init(x, u, t, param, zlt, wind, ca):
 
 
 def rocket_simulation(x_init, u_table, pdict, t_init, t_out, dt=0.1):
-    """Simulates the motion of the rocket and output time history.
+    """
+    Simulate rocket trajectory through numerical integration.
+
+    Performs time integration of the 6-DOF equations of motion from initial 
+    conditions to generate a reference trajectory for optimization initialization.
+    Handles stage separation, attitude modes, and outputs at specified times.
 
     Args:
-        x_init (ndarray) : initial values of the state vector
-        u_table (ndarray) : time history of the rate
-        pdict (dict) : dict of parameters
-        t_init (float64) : initial time
-        t_out (ndarray or float64) : time(s) used for output
-        dt (float64) : integration interval
+        x_init (ndarray): Initial state vector [11 elements]:
+            [mass, pos_X, pos_Y, pos_Z, vel_X, vel_Y, vel_Z, q0, q1, q2, q3]
+        u_table (ndarray): Time history of angular rates, shape (N, 4):
+            columns [time, roll_rate, pitch_rate, yaw_rate] [s, deg/s, deg/s, deg/s]
+        pdict (dict): Dictionary of rocket and flight parameters including:
+            - 'params': Section parameters (thrust, mass flow, events)
+            - 'wind_table', 'ca_table': Environmental data
+        t_init (float): Initial simulation time [s]
+        t_out (ndarray or float): Output time(s) for interpolation [s].
+            Can be single value (final time) or array of times.
+        dt (float, optional): Integration time step [s]. Default is 0.1.
 
     Returns:
-        ndarray : time history of the state vector
+        tuple: (x_out, u_out) where:
+            - x_out (ndarray): State history at output times, shape (len(t_out), 11)
+            - u_out (ndarray): Angular rate history at output times, shape (len(t_out), 3)
+
+    Notes:
+        Uses 4th-order Runge-Kutta integration.
+        Automatically handles stage jettison and zero-lift turn corrections.
+        Normalizes quaternions at each step to prevent drift.
     """
 
     x_map = [x_init]
@@ -209,19 +236,28 @@ def rocket_simulation(x_init, u_table, pdict, t_init, t_out, dt=0.1):
 
 
 def zerolift_turn_correct(x, t, wind=np.zeros((2, 3))):
-    """Corrects attitude quaternion during zero-lift turn.
+    """
+    Correct attitude quaternion during zero-lift turn maneuver.
 
-    The body axis is corrected to be perpendicular to the air velocity.
-    The roll angle is corrected to be zero.
+    Adjusts the body frame orientation so that the thrust axis aligns with 
+    the airspeed vector (zero angle of attack) and the roll angle is zero.
+    This is used for gravity turn trajectories.
 
     Args:
-        x (ndarray) : state vector
-        t (float64) : time
-        wind (ndarray) : wind table
+        x (ndarray): State vector [11 elements] containing position, velocity, 
+            and quaternion
+        t (float): Time since epoch [s]
+        wind (ndarray, optional): Wind table [altitude(m), wind_N(m/s), wind_E(m/s)].
+            Default is no wind.
 
     Returns:
-        ndarray : corrected quaternion
+        ndarray: Corrected quaternion from ECI to body frame (q0, q1, q2, q3) [4 elements],
+            normalized to unit magnitude.
 
+    Notes:
+        Body X-axis aligned with airspeed vector.
+        Body Y-axis perpendicular to position vector (zero roll).
+        Body Z-axis completes right-handed coordinate system.
     """
 
     # mass = x[0]

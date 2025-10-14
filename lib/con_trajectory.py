@@ -54,18 +54,58 @@ from .coordinate_c import conj, quatrot, normalize
 
 
 def yb_r_dot(pos_eci, quat_eci2body):
-    """Returns sine of roll angles."""
+    """
+    Calculate sine of roll angle for a single state.
+    
+    Computes the dot product between the body y-axis direction and the normalized 
+    position vector, which gives the sine of the roll angle in the trajectory plane.
+    
+    Args:
+        pos_eci (numpy.ndarray): Position vector in ECI frame [m] (3,)
+        quat_eci2body (numpy.ndarray): Quaternion from ECI to body frame (4,)
+    
+    Returns:
+        float: Sine of roll angle (ranges from -1 to 1)
+    """
     yb_dir_eci = quatrot(conj(quat_eci2body), np.array([0.0, 1.0, 0.0]))
     return yb_dir_eci.dot(normalize(pos_eci))
 
 
 def roll_direction_array(pos, quat):
-    """Returns array of sine of roll angles for each state values."""
+    """
+    Calculate sine of roll angles for all trajectory points.
+    
+    Computes roll angle sines for an array of position and quaternion states.
+    
+    Args:
+        pos (numpy.ndarray): Array of position vectors in ECI frame [m], shape (N,3)
+        quat (numpy.ndarray): Array of quaternions from ECI to body frame, shape (N,4)
+    
+    Returns:
+        numpy.ndarray: Array of sine of roll angles for each state (N,)
+    """
     return np.array([yb_r_dot(pos[i], quat[i]) for i in range(len(pos))])
 
 
 def inequality_mass(xdict, pdict, unitdict, condition):
-    """Inequality constraint about max propellant mass."""
+    """
+    Inequality constraint enforcing non-negative propellant mass.
+    
+    Ensures that the remaining propellant mass in each stage never becomes negative
+    during the trajectory by constraining mass to remain above the dry mass.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables with 'mass'
+        pdict (dict): Dictionary with 'RocketStage' parameters including:
+            - 'mass_dry': Dry mass of each stage [kg]
+            - 'ignition_at', 'jettison_at': Stage event names
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        numpy.ndarray: Array of mass constraint violations (should be non-negative).
+            Negative values indicate constraint violation.
+    """
 
     con = []
 
@@ -96,7 +136,22 @@ def inequality_mass(xdict, pdict, unitdict, condition):
 
 
 def inequality_jac_mass(xdict, pdict, unitdict, condition):
-    """Jacobian of inequality_mass"""
+    """
+    Compute Jacobian matrix of inequality_mass constraint.
+    
+    Calculates the partial derivatives of propellant mass constraints with respect 
+    to the mass state variable.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables
+        pdict (dict): Dictionary with 'RocketStage' and section parameters
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        dict: Jacobian matrix in COO sparse format with key 'mass', containing
+            'coo' (row, col, data) and 'shape' (nRow, nCol).
+    """
 
     jac = {}
 
@@ -138,7 +193,22 @@ def inequality_jac_mass(xdict, pdict, unitdict, condition):
 
 
 def inequality_kickturn(xdict, pdict, unitdict, condition):
-    """Inequality constraint about minimum rate at kick-turn."""
+    """
+    Inequality constraint for minimum pitch rate during kick-turn maneuver.
+    
+    Enforces that pitch angular velocity remains above minimum during kick-turn 
+    sections to ensure proper trajectory shaping.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables with 'u' (angular velocity)
+        pdict (dict): Dictionary with section parameters indicating 'kick' attitude mode
+        unitdict (dict): Dictionary of unit scaling factors with 'u'
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        numpy.ndarray: Array of angular velocity constraint violations (negative values
+            indicate constraint satisfaction).
+    """
 
     con = []
     unit_u = unitdict["u"]
@@ -157,7 +227,22 @@ def inequality_kickturn(xdict, pdict, unitdict, condition):
 
 
 def inequality_jac_kickturn(xdict, pdict, unitdict, condition):
-    """Jacobian of inequality_kickturn."""
+    """
+    Compute Jacobian matrix of inequality_kickturn constraint.
+    
+    Calculates the partial derivatives of kick-turn rate constraints with respect 
+    to angular velocity.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables
+        pdict (dict): Dictionary with section parameters
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        dict: Jacobian matrix in COO sparse format with key 'u', containing
+            'coo' (row, col, data) and 'shape' (nRow, nCol).
+    """
 
     jac = {}
     num_sections = pdict["num_sections"]
@@ -190,7 +275,25 @@ def inequality_jac_kickturn(xdict, pdict, unitdict, condition):
 
 
 def equality_6DoF_rate(xdict, pdict, unitdict, condition):
-    """Equality constraint about angular rate."""
+    """
+    Equality constraint relating roll rate to trajectory geometry.
+    
+    Enforces the relationship between the body-frame roll rate and the rate of change 
+    of roll angle relative to the trajectory plane. This ensures consistency between 
+    angular velocity commands and actual trajectory rotation.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables:
+            - 'position': Position vectors (N,3)
+            - 'quaternion': Quaternions (N,4)
+            - 'u': Angular velocities (N,3) [rad/s]
+        pdict (dict): Dictionary with section parameters and 'ps_params'
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        numpy.ndarray: Array of roll rate constraint violations (should be zero at optimum).
+    """
 
     con = []
 
@@ -287,6 +390,23 @@ def equality_length_6DoF_rate(xdict, pdict, unitdict, condition):
 
 
 def roll_direction_array_gradient(pos, quat, unit_pos, dx):
+    """
+    Calculate gradient of roll direction vector array.
+    
+    Computes the partial derivatives of roll direction vectors with respect to 
+    position and quaternion for an array of trajectory points using finite difference.
+    
+    Args:
+        pos (numpy.ndarray): Normalized position array in ECI frame (n, 3)
+        quat (numpy.ndarray): Attitude quaternion array (n, 4)
+        unit_pos (float): Position unit scaling factor [m]
+        dx (float): Finite difference step size
+    
+    Returns:
+        dict: Dictionary containing gradient arrays:
+            - 'position': ∂roll_dir/∂pos (n, 3)
+            - 'quaternion': ∂roll_dir/∂quat (n, 4)
+    """
     grad = {
         "position": np.zeros((len(pos), 3)),
         "quaternion": np.zeros((len(pos), 4)),
@@ -310,7 +430,20 @@ def roll_direction_array_gradient(pos, quat, unit_pos, dx):
 
 
 def equality_jac_6DoF_rate(xdict, pdict, unitdict, condition):
-    """Jacobian of equality_rate."""
+    """Compute Jacobian of 6-DOF rate equality constraints.
+    
+    Calculates partial derivatives of attitude rate continuity constraints with respect to 
+    position, quaternion, and control inputs (angular rates).
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('position', 'quaternion', 'u')
+        pdict (dict): Dictionary with problem parameters and 'dx' (finite difference step)
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary with attitude control specifications
+    
+    Returns:
+        dict: Jacobian matrices in COO sparse format for 'position', 'quaternion', and 'u'
+    """
 
     jac = {}
     dx = pdict["dx"]

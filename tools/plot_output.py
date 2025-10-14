@@ -23,11 +23,46 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+"""
+Trajectory Output Plotting Module
+==================================
+
+Provides visualization functions for trajectory optimization results.
+
+This module creates various plots to analyze optimized trajectories including:
+altitude profiles, orbital elements, velocities, angles of attack, dynamic 
+pressure, mass history, and thrust profiles.
+
+Main Functions:
+    display_6DoF: Create comprehensive set of trajectory plots
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 
 
 def display_6DoF(out, flag_savefig=False):
+    """
+    Display comprehensive 6-DOF trajectory analysis plots.
+    
+    Creates multiple matplotlib figures showing trajectory characteristics:
+    altitude, orbital elements, velocities, aerodynamic parameters, mass, and thrust.
+    
+    Args:
+        out (pandas.DataFrame): Trajectory results with columns including:
+            - 'time', 'altitude', 'altitude_apogee', 'altitude_perigee'
+            - 'inclination', 'lon_ascending_node', 'argument_perigee'
+            - Velocity components, angle of attack, dynamic pressure
+            - 'mass_total', 'thrust_vac', etc.
+        flag_savefig (bool, optional): If True, save figures to 'figures/' directory.
+            Default is False.
+    
+    Returns:
+        None: Displays plots using matplotlib.pyplot.show()
+    
+    Notes:
+        Requires 'figures/' directory to exist if flag_savefig=True.
+    """
 
     plt.figure()
     plt.title("Altitude[km]")

@@ -26,6 +26,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.githubpages',
     'sphinx.ext.intersphinx',
+    'breathe',
 ]
 
 templates_path = ['_templates']
@@ -47,7 +48,6 @@ autodoc_member_order = 'bysource'
 
 # Mock imports for modules that can't be imported during doc build
 autodoc_mock_imports = [
-    'numba',
     'user_constraints',
     'dynamics_c',
     'coordinate_c',
@@ -65,3 +65,9 @@ intersphinx_mapping = {
     'numpy': ('https://numpy.org/doc/stable/', None),
     'scipy': ('https://docs.scipy.org/doc/scipy/', None),
 }
+
+# Breathe Configuration for C++ Documentation
+breathe_projects = {
+    "GELATO_CPP": "_build/doxygen/xml"
+}
+breathe_default_project = "GELATO_CPP"

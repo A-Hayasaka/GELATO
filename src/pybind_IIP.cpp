@@ -23,6 +23,16 @@
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+/**
+ * @file pybind_IIP.cpp
+ * @brief PyBind11 module definition for IIP (Instantaneous Impact Point) calculation
+ * 
+ * This file creates the Python module 'IIP_c' which exposes the C++
+ * IIP calculation function to Python. The IIP is calculated using the
+ * FAA simplified method and results are returned in geodetic coordinates
+ * with degrees (suitable for Python usage).
+ */
+
 #include <pybind11/eigen.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>

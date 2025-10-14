@@ -46,7 +46,6 @@ Functions:
     dynamics_mass: Mass equations of motion
 """
 
-from numba import jit
 import numpy as np
 from numpy.linalg import norm
 from .coordinate import (

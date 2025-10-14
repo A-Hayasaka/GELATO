@@ -23,6 +23,15 @@
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+/**
+ * @file Air.cpp
+ * @brief Implementation of U.S. Standard Atmosphere 1976 model
+ * 
+ * This file contains the implementation of atmospheric property calculations
+ * based on the U.S. Standard Atmosphere 1976 model. Constants and layer
+ * parameters are defined according to the standard specification.
+ */
+
 #include "Air.hpp"
 
 const double Air::Rstar = 8314.32;

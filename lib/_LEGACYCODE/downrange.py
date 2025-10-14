@@ -48,6 +48,26 @@ from math import sin, cos, tan, atan, atan2, sqrt, pi
 
 
 def distance_vincenty(lat_origin, lon_origin, lat_target, lon_target):
+    """
+    Calculate great circle distance between two points using Vincenty formula.
+    
+    Computes the geodesic distance on the WGS84 ellipsoid between two geographic 
+    coordinates using Vincenty's iterative method. This is more accurate than the 
+    haversine formula for non-spherical Earth.
+    
+    Args:
+        lat_origin (float): Origin latitude in degrees
+        lon_origin (float): Origin longitude in degrees  
+        lat_target (float): Target latitude in degrees
+        lon_target (float): Target longitude in degrees
+    
+    Returns:
+        float: Distance in meters along the Earth's surface (geodesic distance).
+    
+    Notes:
+        Uses WGS84 ellipsoid parameters: a=6378137m, f=1/298.257223563.
+        Maximum 5000 iterations for convergence.
+    """
 
     itr_limit = 5000
     Ra = 6378137.0
@@ -130,6 +150,22 @@ def distance_vincenty(lat_origin, lon_origin, lat_target, lon_target):
 
 
 def add_downrange(df):
+    """
+    Add downrange distance column to trajectory DataFrame.
+    
+    Calculates and adds a 'downrange' column to the input DataFrame, representing 
+    the geodesic distance from the launch point (first row) to each trajectory point.
+    
+    Args:
+        df (pandas.DataFrame): Trajectory data with 'lat' and 'lon' columns in degrees
+    
+    Returns:
+        pandas.DataFrame: Input DataFrame with added 'downrange' column in meters
+    
+    Notes:
+        Uses Vincenty formula for accurate distance calculation on WGS84 ellipsoid.
+        Origin point is defined as the first row of the DataFrame.
+    """
     lon_origin = df["lon"].iat[0]
     lat_origin = df["lat"].iat[0]
     df["downrange"] = [

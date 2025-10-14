@@ -8,9 +8,12 @@ GELATO (Generic Launch Trajectory Optimizer) is an open source tool for launch t
    :caption: Contents:
 
    installation
+   tutorial
    usage
+   examples
    modules
    api
+   cpp_api
 
 Key Features
 ------------

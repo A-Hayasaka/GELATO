@@ -55,18 +55,44 @@ from lib.IIP_c import posLLH_IIP_FAA
 
 
 def output_result(xdict, unitdict, tx_res, tu_res, pdict):
-    """Returns DataFrame that contains optimization results.
+    """
+    Convert optimization results to comprehensive DataFrame with physical quantities.
+
+    Transforms normalized state variables from the optimization solver into dimensional 
+    physical quantities and calculates derived parameters (altitude, orbital elements, 
+    aerodynamic parameters, IIP, etc.) at each time step.
 
     Args:
-        xdict (dict) : dict of calculation result
-        unitdict (dict) : dict of units of the state vector
-        tx_res (ndarray) : time of nodes including initial points
-        tu_res (ndarray) : time of LGR nodes
-        pdict (dict) : dict of parameters
+        xdict (dict): Dictionary of optimization results (dimensionless) with keys:
+            - 'mass': Mass array
+            - 'position': Flattened position array (ECI frame)
+            - 'velocity': Flattened velocity array (ECI frame)
+            - 'quaternion': Flattened quaternion array (ECI to body)
+            - 'u': Flattened angular rate array (body frame)
+        unitdict (dict): Unit scaling factors with keys:
+            - 'mass', 'position', 'velocity', 'u', 't'
+        tx_res (ndarray): Time array for state points (includes knot points) [s]
+        tu_res (ndarray): Time array for control points (LGR nodes) [s]
+        pdict (dict): Dictionary of parameters including:
+            - 'params': Section parameters (thrust, mass flow, events)
+            - 'wind_table': Wind data
+            - 'ca_table': Aerodynamic coefficient data
+            - 'LaunchCondition': Launch site location
 
     Returns:
-        DataFrame : time history of state vectors and other values
+        pandas.DataFrame: Time history with columns including:
+            - Time, event names, section/stage indices
+            - Mass, thrust, position (lat/lon/alt), velocities
+            - Orbital elements (apogee, perigee, inclination, RAAN, etc.)
+            - Aerodynamic parameters (AoA, dynamic pressure, Mach, Q-alpha)
+            - Attitude (Euler angles, quaternion, angular rates)
+            - IIP coordinates (lat_IIP, lon_IIP)
+            - Ground track and downrange distance
 
+    Notes:
+        Uses US Standard Atmosphere 1976 for atmospheric properties.
+        Assumes WGS84 ellipsoid for geodetic calculations.
+        Interpolates angular rates from LGR nodes to state nodes.
     """
 
     N = len(tx_res)

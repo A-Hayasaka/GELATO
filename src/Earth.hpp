@@ -23,6 +23,16 @@
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+/**
+ * @file Earth.hpp
+ * @brief WGS84 Earth model and geodetic coordinate utilities
+ * 
+ * This header provides WGS84 Earth model constants and functions for
+ * converting between ECEF and geodetic coordinates. Also includes
+ * Vincenty formula for calculating geodesic distances on the Earth's
+ * ellipsoidal surface.
+ */
+
 #include <Eigen/Core>
 #include <cmath>
 #include <utility>
@@ -30,20 +40,50 @@
 #ifndef SRC_EARTH_HPP_
 #define SRC_EARTH_HPP_
 
+/**
+ * @brief Earth model parameters and coordinate conversion utilities
+ * 
+ * Provides WGS84 Earth model constants and methods for converting between
+ * ECEF and geodetic coordinates, as well as calculating distances using
+ * the Vincenty formula.
+ */
 class Earth {
  public:
-  static const double mu;
-  static const double omega_earth_rps;
-  static const double Ra;
-  static const double f;
-  static const double Rb;
-  static const double e2;
-  static const double ep2;
+  static const double mu;                ///< Earth's gravitational parameter [m³/s²]
+  static const double omega_earth_rps;   ///< Earth's rotation rate [rad/s]
+  static const double Ra;                ///< WGS84 equatorial radius [m]
+  static const double f;                 ///< WGS84 flattening [-]
+  static const double Rb;                ///< WGS84 polar radius [m]
+  static const double e2;                ///< First eccentricity squared [-]
+  static const double ep2;               ///< Second eccentricity squared [-]
 
+  /**
+   * @brief Helper function to compute square of a value
+   * @param x Input value
+   * @return x²
+   */
   static inline double pow2(double x) { return x * x; }
 
+  /**
+   * @brief Convert ECEF coordinates to geodetic coordinates
+   * @param pos_ecef Position in ECEF frame [m] as (x, y, z)
+   * @return Geodetic coordinates (latitude [rad], longitude [rad], altitude [m])
+   */
   static Eigen::Vector3d ecef2geodetic(Eigen::Vector3d pos_ecef);
+  
+  /**
+   * @brief Convert geodetic coordinates to ECEF coordinates
+   * @param geodetic Geodetic coordinates (latitude [rad], longitude [rad], altitude [m])
+   * @return Position in ECEF frame [m] as (x, y, z)
+   */
   static Eigen::Vector3d geodetic2ecef(Eigen::Vector3d geodetic);
+  
+  /**
+   * @brief Calculate distance and azimuth between two points using Vincenty formula
+   * @param observer_LLH Observer position (latitude [rad], longitude [rad], height [m])
+   * @param target_LLH Target position (latitude [rad], longitude [rad], height [m])
+   * @return Pair of (distance [m], azimuth [rad])
+   */
   static std::pair<double, double> distance_vincenty(
       Eigen::Vector3d observer_LLH, Eigen::Vector3d target_LLH);
 };

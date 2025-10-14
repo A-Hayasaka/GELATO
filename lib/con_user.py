@@ -51,12 +51,32 @@ from .jac_fd import jac_fd
 
 
 def equality_jac_user(xdict, pdict, unitdict, condition):
-    """Jacobian of user-defined equality constraint."""
+    """Compute Jacobian of user-defined equality constraints using finite differences.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables
+        pdict (dict): Dictionary with problem parameters
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        dict or None: Jacobian matrices computed via finite differences, or None if no user constraints defined
+    """
     if equality_user(xdict, pdict, unitdict, condition) is not None:
         return jac_fd(equality_user, xdict, pdict, unitdict, condition)
 
 
 def inequality_jac_user(xdict, pdict, unitdict, condition):
-    """Jacobian of user-defined inequality constraint."""
+    """Compute Jacobian of user-defined inequality constraints using finite differences.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables
+        pdict (dict): Dictionary with problem parameters
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary
+    
+    Returns:
+        dict or None: Jacobian matrices computed via finite differences, or None if no user constraints defined
+    """
     if inequality_user(xdict, pdict, unitdict, condition) is not None:
         return jac_fd(inequality_user, xdict, pdict, unitdict, condition)

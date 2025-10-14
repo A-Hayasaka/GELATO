@@ -23,6 +23,19 @@
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+/**
+ * @file pybind_coordinate.cpp
+ * @brief PyBind11 module definition for coordinate transformation functions
+ * 
+ * This file creates the Python module 'coordinate_c' which exposes C++
+ * coordinate transformation functions to Python. The module includes:
+ * - Quaternion operations
+ * - Coordinate frame conversions (ECEF, ECI, NED, geodetic)
+ * - Direction cosine matrix operations
+ * - Orbital mechanics calculations
+ * - Gravity calculations
+ */
+
 #include "wrapper_coordinate.hpp"
 
 PYBIND11_MODULE(coordinate_c, m) {

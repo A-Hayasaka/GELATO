@@ -251,7 +251,19 @@ def dynamic_pressure_pa(pos_eci, vel_eci, t, wind):
 
 
 def dynamic_pressure_array_pa(pos_eci, vel_eci, t, wind):
-    """Array version of dynamic_pressure_pa."""
+    """Calculate dynamic pressure for multiple trajectory points.
+    
+    Vectorized version of dynamic_pressure_pa for processing trajectory arrays.
+    
+    Args:
+        pos_eci (ndarray): Array of ECI positions (N, 3) [m]
+        vel_eci (ndarray): Array of ECI velocities (N, 3) [m/s]
+        t (ndarray): Array of times (N,) [s]
+        wind (callable): Wind model function
+    
+    Returns:
+        ndarray: Dynamic pressure values (N,) [Pa]
+    """
     q = np.zeros(pos_eci.shape[0])
     for i in range(pos_eci.shape[0]):
         q[i] = dynamic_pressure_pa(pos_eci[i], vel_eci[i], t[i], wind)
@@ -259,14 +271,38 @@ def dynamic_pressure_array_pa(pos_eci, vel_eci, t, wind):
 
 
 def q_alpha_pa_rad(pos_eci, vel_eci, quat, t, wind):
-    """Calculates Q_alpha."""
+    """Calculate Q-alpha (dynamic pressure × angle of attack).
+    
+    Args:
+        pos_eci (ndarray): ECI position (3,) [m]
+        vel_eci (ndarray): ECI velocity (3,) [m/s]
+        quat (ndarray): Attitude quaternion (4,)
+        t (float): Time [s]
+        wind (callable): Wind model function
+    
+    Returns:
+        float: Q-alpha [Pa·rad]
+    """
     alpha = angle_of_attack_all_rad(pos_eci, vel_eci, quat, t, wind)
     q = dynamic_pressure_pa(pos_eci, vel_eci, t, wind)
     return q * alpha
 
 
 def q_alpha_array_pa_rad(pos_eci, vel_eci, quat, t, wind):
-    """Array version of q_alpha_pa_rad."""
+    """Calculate Q-alpha for multiple trajectory points.
+    
+    Vectorized version of q_alpha_pa_rad for processing trajectory arrays.
+    
+    Args:
+        pos_eci (ndarray): Array of ECI positions (N, 3) [m]
+        vel_eci (ndarray): Array of ECI velocities (N, 3) [m/s]
+        quat (ndarray): Array of quaternions (N, 4)
+        t (ndarray): Array of times (N,) [s]
+        wind (callable): Wind model function
+    
+    Returns:
+        ndarray: Q-alpha values (N,) [Pa·rad]
+    """
     qa = np.zeros(pos_eci.shape[0])
     for i in range(pos_eci.shape[0]):
         qa[i] = q_alpha_pa_rad(pos_eci[i], vel_eci[i], quat[i], t[i], wind)

@@ -65,6 +65,22 @@ from .IIP_c import posLLH_IIP_FAA
 
 
 def sin_elevation(pos_, t_, posECEF_ANT, unit_pos, unit_t):
+    """
+    Calculate sine of elevation angle from antenna to rocket.
+    
+    Computes the sine of the elevation angle at which a ground antenna observes 
+    the rocket, measured from the local horizontal plane.
+    
+    Args:
+        pos_ (numpy.ndarray): Normalized position in ECI frame (3,)
+        t_ (float): Normalized time
+        posECEF_ANT (numpy.ndarray): Antenna position in ECEF frame [m] (3,)
+        unit_pos (float): Position unit scaling factor [m]
+        unit_t (float): Time unit scaling factor [s]
+    
+    Returns:
+        float: Sine of elevation angle (1.0 = zenith, 0.0 = horizon, -1.0 = nadir)
+    """
     pos = pos_ * unit_pos
     to = t_ * unit_t
     posECEF = eci2ecef(pos, to)
@@ -74,6 +90,20 @@ def sin_elevation(pos_, t_, posECEF_ANT, unit_pos, unit_t):
 
 
 def sin_elevation_gradient(pos_, t_, posECEF_ANT, unit_pos, unit_t, dx):
+    """
+    Calculate gradient of sine of elevation angle using finite differences.
+    
+    Args:
+        pos_ (numpy.ndarray): Normalized position in ECI frame (3,)
+        t_ (float): Normalized time
+        posECEF_ANT (numpy.ndarray): Antenna position in ECEF frame [m] (3,)
+        unit_pos (float): Position unit scaling factor
+        unit_t (float): Time unit scaling factor
+        dx (float): Finite difference step size
+    
+    Returns:
+        dict: Gradient dictionary with keys 'position' (3,) and 't' (scalar)
+    """
     grad = {"position": np.zeros(3), "t": 0.0}
     f_center = sin_elevation(pos_, t_, posECEF_ANT, unit_pos, unit_t)
     for j in range(3):
@@ -90,7 +120,23 @@ def sin_elevation_gradient(pos_, t_, posECEF_ANT, unit_pos, unit_t, dx):
 
 
 def inequality_antenna(xdict, pdict, unitdict, condition):
-    """Inequality constraint about antenna elevation angle."""
+    """
+    Inequality constraint for minimum antenna elevation angle.
+    
+    Ensures that the rocket remains visible from specified ground antennas with 
+    elevation angle above minimum thresholds during designated flight phases.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables with 'position' and 't'
+        pdict (dict): Dictionary with section parameters and 'ps_params'
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration with 'antenna' specifications:
+            - Each antenna has 'lat', 'lon', 'altitude', and 'elevation_min' per section
+    
+    Returns:
+        numpy.ndarray or None: Array of elevation constraint violations (positive when 
+            constraint is satisfied), or None if no antenna constraints exist.
+    """
     con = []
 
     unit_pos = unitdict["position"]
@@ -128,7 +174,21 @@ def inequality_antenna(xdict, pdict, unitdict, condition):
 
 
 def inequality_jac_antenna(xdict, pdict, unitdict, condition):
-    """Jacobian of inequality_antenna."""
+    """Compute Jacobian of antenna visibility inequality constraints.
+    
+    Calculates partial derivatives of antenna elevation angle constraints with respect 
+    to position and time.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('position', 't')
+        pdict (dict): Dictionary with problem parameters and 'dx' (finite difference step)
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary with antenna definitions
+    
+    Returns:
+        dict or None: Jacobian matrices in COO sparse format for 'position' and 't',
+            or None if no antenna constraints defined
+    """
 
     jac = {}
     dx = pdict["dx"]
@@ -184,7 +244,22 @@ def inequality_jac_antenna(xdict, pdict, unitdict, condition):
 
 
 def equality_IIP(xdict, pdict, unitdict, condition):
-    """Equality constraint about IIP position."""
+    """
+    Equality constraint for Instantaneous Impact Point (IIP) position.
+    
+    Enforces that the predicted impact point (where the vehicle would land if thrust
+    were cut off) passes through specified latitude/longitude coordinates at waypoint times.
+    Uses FAA-standard IIP calculation method.
+    
+    Args:
+        xdict (dict): State variables (position, velocity, quaternion, time)
+        pdict (dict): Problem parameters including section definitions
+        unitdict (dict): Unit scaling factors
+        condition (dict): Waypoint conditions specifying 'lat_IIP' and/or 'lon_IIP' targets
+    
+    Returns:
+        numpy.ndarray or None: Normalized constraint residuals (should be 0), or None if no IIP constraints
+    """
     con = []
     unit_pos = unitdict["position"]
     unit_vel = unitdict["velocity"]
@@ -230,6 +305,27 @@ def equality_IIP(xdict, pdict, unitdict, condition):
 
 
 def posLLH_IIP_gradient(pos_ECI, vel_ECI, t, unit_pos, unit_vel, unit_t, dx):
+    """
+    Calculate gradient of IIP (Instantaneous Impact Point) position in LLH coordinates.
+    
+    Computes the partial derivatives of IIP latitude, longitude, and altitude with respect
+    to position, velocity, and time using finite difference method.
+    
+    Args:
+        pos_ECI (numpy.ndarray): Normalized position in ECI frame (3,)
+        vel_ECI (numpy.ndarray): Normalized velocity in ECI frame (3,)
+        t (float): Normalized time
+        unit_pos (float): Position unit scaling factor [m]
+        unit_vel (float): Velocity unit scaling factor [m/s]
+        unit_t (float): Time unit scaling factor [s]
+        dx (float): Finite difference step size
+    
+    Returns:
+        dict: Dictionary containing gradient matrices:
+            - 'position': ∂IIP/∂pos (3x3 matrix)
+            - 'velocity': ∂IIP/∂vel (3x3 matrix)
+            - 't': ∂IIP/∂t (3,)
+    """
     grad = {
         "position": np.zeros((3, 3)),
         "velocity": np.zeros((3, 3)),
@@ -237,6 +333,7 @@ def posLLH_IIP_gradient(pos_ECI, vel_ECI, t, unit_pos, unit_vel, unit_t, dx):
     }
 
     def iip_from_eci(pos_, vel_, t_):
+        """Convert normalized ECI state to IIP in LLH coordinates."""
         return posLLH_IIP_FAA(
             eci2ecef(pos_ * unit_pos, t_ * unit_t),
             vel_eci2ecef(vel_ * unit_vel, pos_ * unit_pos, t_ * unit_t),
@@ -263,7 +360,21 @@ def posLLH_IIP_gradient(pos_ECI, vel_ECI, t, unit_pos, unit_vel, unit_t, dx):
 
 
 def equality_jac_IIP(xdict, pdict, unitdict, condition):
-    """Jacobian of equality_IIP."""
+    """Compute Jacobian of IIP (Instantaneous Impact Point) equality constraints.
+    
+    Calculates partial derivatives of IIP position constraints with respect to 
+    position, velocity, and time using finite differences.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('position', 'velocity', 't')
+        pdict (dict): Dictionary with problem parameters and 'dx' (finite difference step)
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary with IIP waypoint definitions
+    
+    Returns:
+        dict or None: Jacobian matrices in COO sparse format for 'position', 'velocity', and 't',
+            or None if no IIP equality constraints defined
+    """
     jac = {}
     dx = pdict["dx"]
 
@@ -350,7 +461,19 @@ def equality_jac_IIP(xdict, pdict, unitdict, condition):
 
 
 def inequality_IIP(xdict, pdict, unitdict, condition):
-    """Inequality constraint about IIP position."""
+    """Inequality constraints on Instantaneous Impact Point (IIP) position.
+    
+    Enforces minimum/maximum bounds on IIP latitude and longitude at waypoints.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('position', 'velocity', 't')
+        pdict (dict): Dictionary with problem parameters
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary with IIP waypoint bounds
+    
+    Returns:
+        ndarray or None: Constraint values (>= 0 when satisfied), or None if no constraints
+    """
     con = []
     unit_pos = unitdict["position"]
     unit_vel = unitdict["velocity"]
@@ -404,7 +527,20 @@ def inequality_IIP(xdict, pdict, unitdict, condition):
 
 
 def inequality_jac_IIP(xdict, pdict, unitdict, condition):
-    """Jacobian of inequality_IIP."""
+    """Compute Jacobian of IIP inequality constraints.
+    
+    Calculates partial derivatives of IIP position bounds with respect to 
+    position, velocity, and time using finite differences.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('position', 'velocity', 't')
+        pdict (dict): Dictionary with problem parameters and 'dx' (finite difference step)
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary with IIP waypoint bounds
+    
+    Returns:
+        dict or None: Jacobian matrices in COO sparse format, or None if no constraints
+    """
     jac = {}
     dx = pdict["dx"]
 
@@ -527,7 +663,19 @@ def inequality_jac_IIP(xdict, pdict, unitdict, condition):
 
 
 def equality_posLLH(xdict, pdict, unitdict, condition):
-    """Equality constraint about IIP position."""
+    """Equality constraints on position in latitude-longitude-height coordinates.
+    
+    Enforces exact position requirements at waypoints in geodetic coordinates (LLH).
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('position', 't')
+        pdict (dict): Dictionary with problem parameters
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary with position waypoint requirements
+    
+    Returns:
+        ndarray or None: Constraint residuals (should equal zero), or None if no constraints
+    """
     con = []
     unit_pos = unitdict["position"]
     unit_t = unitdict["t"]
@@ -572,9 +720,28 @@ def equality_posLLH(xdict, pdict, unitdict, condition):
 
 
 def posLLH_gradient(pos_ECI, t, unit_pos, unit_t, dx):
+    """
+    Calculate gradient of position in LLH (Latitude, Longitude, Height) coordinates.
+    
+    Computes the partial derivatives of geodetic coordinates with respect to 
+    position in ECI frame and time using finite difference method.
+    
+    Args:
+        pos_ECI (numpy.ndarray): Normalized position in ECI frame (3,)
+        t (float): Normalized time
+        unit_pos (float): Position unit scaling factor [m]
+        unit_t (float): Time unit scaling factor [s]
+        dx (float): Finite difference step size
+    
+    Returns:
+        dict: Dictionary containing gradient matrices:
+            - 'position': ∂LLH/∂pos (3x3 matrix)
+            - 't': ∂LLH/∂t (3,)
+    """
     grad = {"position": np.zeros((3, 3)), "t": np.zeros(3)}
 
     def pos_llh(pos_, t_):
+        """Convert normalized ECI position to LLH coordinates."""
         return eci2geodetic(pos_ * unit_pos, t_ * unit_t)
 
     f_center = pos_llh(pos_ECI, t)
@@ -593,9 +760,31 @@ def posLLH_gradient(pos_ECI, t, unit_pos, unit_t, dx):
 
 
 def downrange_gradient(pos_ECI, t, unit_pos, unit_t, lat0, lon0, dx):
+    """
+    Calculate gradient of downrange distance from reference point.
+    
+    Computes the partial derivatives of downrange distance (measured along Earth's surface
+    from a reference latitude/longitude) with respect to position and time using finite 
+    difference method.
+    
+    Args:
+        pos_ECI (numpy.ndarray): Normalized position in ECI frame (3,)
+        t (float): Normalized time
+        unit_pos (float): Position unit scaling factor [m]
+        unit_t (float): Time unit scaling factor [s]
+        lat0 (float): Reference latitude [rad]
+        lon0 (float): Reference longitude [rad]
+        dx (float): Finite difference step size
+    
+    Returns:
+        dict: Dictionary containing gradient vectors:
+            - 'position': ∂downrange/∂pos (3,)
+            - 't': ∂downrange/∂t (scalar)
+    """
     grad = {"position": np.zeros(3), "t": 0.0}
 
     def downrange(pos_, t_):
+        """Calculate downrange distance from reference point to current position."""
         pos_llh = eci2geodetic(pos_ * unit_pos, t_ * unit_t)
         return distance_vincenty(
             lat0,
@@ -620,7 +809,20 @@ def downrange_gradient(pos_ECI, t, unit_pos, unit_t, lat0, lon0, dx):
 
 
 def equality_jac_posLLH(xdict, pdict, unitdict, condition):
-    """Jacobian of equality_posLLH."""
+    """Compute Jacobian of position equality constraints in LLH coordinates.
+    
+    Calculates partial derivatives of geodetic position constraints with respect to 
+    ECI position and time using finite differences.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('position', 't')
+        pdict (dict): Dictionary with problem parameters and 'dx' (finite difference step)
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary with position waypoint requirements
+    
+    Returns:
+        dict or None: Jacobian matrices in COO sparse format, or None if no constraints
+    """
 
     jac = {}
     dx = pdict["dx"]
@@ -701,7 +903,19 @@ def equality_jac_posLLH(xdict, pdict, unitdict, condition):
 
 
 def inequality_posLLH(xdict, pdict, unitdict, condition):
-    """Inequality constraint about IIP position."""
+    """Inequality constraints on position in latitude-longitude-height coordinates.
+    
+    Enforces minimum/maximum bounds on position at waypoints in geodetic coordinates.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('position', 't')
+        pdict (dict): Dictionary with problem parameters
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary with position bounds
+    
+    Returns:
+        ndarray or None: Constraint values (>= 0 when satisfied), or None if no constraints
+    """
     con = []
     unit_pos = unitdict["position"]
     unit_t = unitdict["t"]
@@ -754,7 +968,20 @@ def inequality_posLLH(xdict, pdict, unitdict, condition):
 
 
 def inequality_jac_posLLH(xdict, pdict, unitdict, condition):
-    """Jacobian of inequality_posLLH."""
+    """Compute Jacobian of position inequality constraints in LLH coordinates.
+    
+    Calculates partial derivatives of geodetic position bounds with respect to 
+    ECI position and time using finite differences.
+    
+    Args:
+        xdict (dict): Dictionary containing state variables ('position', 't')
+        pdict (dict): Dictionary with problem parameters and 'dx' (finite difference step)
+        unitdict (dict): Dictionary of unit scaling factors
+        condition (dict): Configuration dictionary with position bounds
+    
+    Returns:
+        dict or None: Jacobian matrices in COO sparse format, or None if no constraints
+    """
 
     jac = {}
     dx = pdict["dx"]

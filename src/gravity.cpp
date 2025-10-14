@@ -6,6 +6,15 @@
 //  Copyright © 2015 Takahiro Inagawa. All rights reserved.
 //
 
+/**
+ * @file gravity.cpp
+ * @brief Implementation of gravity model calculations
+ * 
+ * This file contains gravity acceleration calculations using both
+ * J2 perturbation model and simple two-body model.
+ * Based on WGS84 EGM96 gravitational model.
+ */
+
 #include "gravity.hpp"
 
 Eigen::Vector3d gravityECI(Eigen::Vector3d posECI_) {

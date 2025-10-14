@@ -45,15 +45,44 @@ import numpy as np
 
 
 def cost_6DoF(xdict, condition):
-    """Objective function of the optimization problem."""
+    """
+    Objective (cost) function for trajectory optimization.
+    
+    Defines the optimization objective based on the selected mode:
+    - 'Payload' mode: Maximize initial mass (negative cost to minimize)
+    - Other modes: Minimize final time (maximize remaining propellant)
+    
+    Args:
+        xdict (dict): Dictionary containing state variables:
+            - 'mass': Mass array (dimensionless)
+            - 't': Time array (dimensionless)
+        condition (dict): Configuration with 'OptimizationMode' specification
+    
+    Returns:
+        float: Scalar cost value to be minimized by the optimizer.
+    """
     if condition["OptimizationMode"] == "Payload":
-        return -xdict["mass"][0]  # 初期質量(無次元)を最大化
+        return -xdict["mass"][0]  # Maximize initial mass (dimensionless)
     else:
-        return xdict["t"][-1]  # 到達時間を最小化(=余剰推進剤を最大化)
+        return xdict["t"][-1]  # Minimize arrival time (= maximize remaining propellant)
 
 
 def cost_jac(xdict, condition):
-    """Gradient of the objective function."""
+    """
+    Compute gradient (Jacobian) of the objective function.
+    
+    Calculates the partial derivatives of the cost function with respect to 
+    optimization variables (mass or time depending on mode).
+    
+    Args:
+        xdict (dict): Dictionary containing state variables
+        condition (dict): Configuration with 'OptimizationMode' specification
+    
+    Returns:
+        dict: Gradient dictionary with keys:
+            - 'mass': Gradient w.r.t. mass (Payload mode)
+            - 't': Gradient w.r.t. time (other modes)
+    """
 
     jac = {}
     if condition["OptimizationMode"] == "Payload":

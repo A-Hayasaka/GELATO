@@ -23,6 +23,15 @@
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+/**
+ * @file Earth.cpp
+ * @brief Implementation of Earth model and coordinate conversion functions
+ * 
+ * This file contains the implementation of WGS84 Earth model constants
+ * and coordinate conversion utilities including geodetic-ECEF transformations
+ * and Vincenty distance calculations.
+ */
+
 #include "Earth.hpp"
 
 #include <Eigen/Core>

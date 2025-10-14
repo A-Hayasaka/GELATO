@@ -23,6 +23,16 @@
 // SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+/**
+ * @file iip.cpp
+ * @brief Implementation of Instantaneous Impact Point (IIP) calculation
+ * 
+ * This file contains the implementation of IIP calculation using the
+ * FAA (Federal Aviation Administration) simplified method.
+ * The algorithm uses Kepler's equations to predict the impact point
+ * assuming thrust termination at the current time.
+ */
+
 #include "iip.hpp"
 
 #include "Coordinate.hpp"
