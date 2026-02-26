@@ -32,7 +32,9 @@ from .dynamics_c import (
     dynamics_velocity_array,
     dynamics_quaternion_array,
     dynamics_velocity_rh_gradient,
-    dynamics_quaternion_rh_gradient
+    dynamics_quaternion_rh_gradient,
+    jac_dynamics_velocity_section,
+    jac_dynamics_quaternion_section,
 )
 
 
@@ -307,11 +309,12 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
 
     param = np.zeros(5)
 
-    jac["mass"] = {"coo": [[], [], []], "shape": (pdict["N"] * 3, pdict["M"])}
-    jac["position"] = {"coo": [[], [], []], "shape": (pdict["N"] * 3, pdict["M"] * 3)}
-    jac["velocity"] = {"coo": [[], [], []], "shape": (pdict["N"] * 3, pdict["M"] * 3)}
-    jac["quaternion"] = {"coo": [[], [], []], "shape": (pdict["N"] * 3, pdict["M"] * 4)}
-    jac["t"] = {"coo": [[], [], []], "shape": (pdict["N"] * 3, num_sections + 1)}
+    # Collect COO arrays from all sections, then concatenate once
+    mass_rows, mass_cols, mass_data = [], [], []
+    pos_rows, pos_cols, pos_data = [], [], []
+    vel_rows, vel_cols, vel_data = [], [], []
+    quat_rows, quat_cols, quat_data = [], [], []
+    t_rows, t_cols, t_data = [], [], []
 
     for i in range(num_sections):
         ua, ub, xa, xb, n = pdict["ps_params"].get_index(i)
@@ -333,76 +336,69 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
 
         Di = pdict["ps_params"].D(i)
 
-        for j in range(n):
-            grad = dynamics_velocity_rh_gradient(
-                mass_i_[j + 1],
-                pos_i_[j + 1],
-                vel_i_[j + 1],
-                quat_i_[j + 1],
-                t_nodes[j + 1],
-                param,
-                wind,
-                ca,
-                units,
-                to,
-                tf,
-                unit_t,
-                dx
-            )
+        sec = jac_dynamics_velocity_section(
+            n, ua, xa, i,
+            mass_i_, pos_i_, vel_i_, quat_i_,
+            t_nodes, param, wind, ca, units,
+            to, tf, unit_t, dx, Di
+        )
 
-            jac["mass"]["coo"][0].extend(range((ua + j) * 3, (ua + j + 1) * 3))
-            jac["mass"]["coo"][1].extend([xa + 1 + j] * 3)
-            jac["mass"]["coo"][2].extend(grad["mass"])
+        mass_rows.append(sec["mass"]["row"])
+        mass_cols.append(sec["mass"]["col"])
+        mass_data.append(sec["mass"]["data"])
+        pos_rows.append(sec["position"]["row"])
+        pos_cols.append(sec["position"]["col"])
+        pos_data.append(sec["position"]["data"])
+        vel_rows.append(sec["velocity"]["row"])
+        vel_cols.append(sec["velocity"]["col"])
+        vel_data.append(sec["velocity"]["data"])
+        quat_rows.append(sec["quaternion"]["row"])
+        quat_cols.append(sec["quaternion"]["col"])
+        quat_data.append(sec["quaternion"]["data"])
+        t_rows.append(sec["t"]["row"])
+        t_cols.append(sec["t"]["col"])
+        t_data.append(sec["t"]["data"])
 
-            jac["position"]["coo"][0].extend(
-                chain.from_iterable(
-                    repeat(jj, 3) for jj in range((ua + j) * 3, (ua + j + 1) * 3)
-                )
-            )
-            jac["position"]["coo"][1].extend(
-                list(range((xa + 1 + j) * 3, (xa + 2 + j) * 3)) * 3
-            )
-            jac["position"]["coo"][2].extend(grad["position"].ravel())
-
-            for jcol in range(n + 1):
-                if jcol == j + 1:
-                    submat_vel = np.eye(3) * Di[j, jcol] + grad["velocity"]
-                    jac["velocity"]["coo"][0].extend(
-                        chain.from_iterable(
-                            repeat(jj, 3)
-                            for jj in range((ua + j) * 3, (ua + j + 1) * 3)
-                        )
-                    )
-                    jac["velocity"]["coo"][1].extend(list(range((xa + jcol) * 3, (xa + jcol + 1) * 3)) * 3)
-                    jac["velocity"]["coo"][2].extend(submat_vel.ravel())
-                else:
-                    jac["velocity"]["coo"][0].extend(range((ua + j) * 3, (ua + j + 1) * 3))
-                    jac["velocity"]["coo"][1].extend(range((xa + jcol) * 3, (xa + jcol + 1) * 3))
-                    jac["velocity"]["coo"][2].extend([Di[j, jcol]] * 3)
-
-            jac["quaternion"]["coo"][0].extend(
-                chain.from_iterable(
-                    repeat(jj, 4) for jj in range((ua + j) * 3, (ua + j + 1) * 3)
-                )
-            )
-            jac["quaternion"]["coo"][1].extend(
-                list(range((xa + 1 + j) * 4, (xa + 2 + j) * 4)) * 3
-            )
-            jac["quaternion"]["coo"][2].extend(grad["quaternion"].ravel())
-
-            jac["t"]["coo"][0].extend(range((ua + j) * 3, (ua + j + 1) * 3))
-            jac["t"]["coo"][1].extend([i] * 3)
-            jac["t"]["coo"][2].extend(grad["to"])
-
-            # t_f
-            jac["t"]["coo"][0].extend(range((ua + j) * 3, (ua + j + 1) * 3))
-            jac["t"]["coo"][1].extend([i + 1] * 3)
-            jac["t"]["coo"][2].extend(grad["tf"])
-
-    for key in jac.keys():
-        jac[key]["coo"][0] = np.array(jac[key]["coo"][0], dtype="i4")
-        jac[key]["coo"][1] = np.array(jac[key]["coo"][1], dtype="i4")
-        jac[key]["coo"][2] = np.array(jac[key]["coo"][2], dtype="f8")
+    jac["mass"] = {
+        "coo": [
+            np.concatenate(mass_rows).astype("i4"),
+            np.concatenate(mass_cols).astype("i4"),
+            np.concatenate(mass_data),
+        ],
+        "shape": (pdict["N"] * 3, pdict["M"]),
+    }
+    jac["position"] = {
+        "coo": [
+            np.concatenate(pos_rows).astype("i4"),
+            np.concatenate(pos_cols).astype("i4"),
+            np.concatenate(pos_data),
+        ],
+        "shape": (pdict["N"] * 3, pdict["M"] * 3),
+    }
+    jac["velocity"] = {
+        "coo": [
+            np.concatenate(vel_rows).astype("i4"),
+            np.concatenate(vel_cols).astype("i4"),
+            np.concatenate(vel_data),
+        ],
+        "shape": (pdict["N"] * 3, pdict["M"] * 3),
+    }
+    jac["quaternion"] = {
+        "coo": [
+            np.concatenate(quat_rows).astype("i4"),
+            np.concatenate(quat_cols).astype("i4"),
+            np.concatenate(quat_data),
+        ],
+        "shape": (pdict["N"] * 3, pdict["M"] * 4),
+    }
+    jac["t"] = {
+        "coo": [
+            np.concatenate(t_rows).astype("i4"),
+            np.concatenate(t_cols).astype("i4"),
+            np.concatenate(t_data),
+        ],
+        "shape": (pdict["N"] * 3, num_sections + 1),
+    }
 
     return jac
 
@@ -460,9 +456,10 @@ def equality_jac_dynamics_quaternion(xdict, pdict, unitdict, condition):
 
     num_sections = pdict["num_sections"]
 
-    jac["quaternion"] = {"coo": [[], [], []], "shape": (pdict["N"] * 4, pdict["M"] * 4)}
-    jac["u"] = {"coo": [[], [], []], "shape": (pdict["N"] * 4, pdict["N"] * 3)}
-    jac["t"] = {"coo": [[], [], []], "shape": (pdict["N"] * 4, num_sections + 1)}
+    # Collect COO arrays from all sections, then concatenate once
+    quat_rows, quat_cols, quat_data = [], [], []
+    u_rows, u_cols, u_data = [], [], []
+    t_rows, t_cols, t_data = [], [], []
 
     for i in range(num_sections):
         ua, ub, xa, xb, n = pdict["ps_params"].get_index(i)
@@ -471,67 +468,49 @@ def equality_jac_dynamics_quaternion(xdict, pdict, unitdict, condition):
         to = t[i]
         tf = t[i + 1]
 
-        if pdict["params"][i]["attitude"] in ["hold", "vertical"]:
-            jac["quaternion"]["coo"][0].extend(range(ua * 4, ub * 4))
-            jac["quaternion"]["coo"][1].extend(list(range(xa * 4, (xa + 1) * 4)) * n)
-            jac["quaternion"]["coo"][2].extend([-1.0] * (4 * n))
+        is_hold = pdict["params"][i]["attitude"] in ["hold", "vertical"]
+        Di = pdict["ps_params"].D(i)
 
-            jac["quaternion"]["coo"][0].extend(range(ua * 4, ub * 4))
-            jac["quaternion"]["coo"][1].extend(list(range((xa + 1) * 4, xb * 4)))
-            jac["quaternion"]["coo"][2].extend([1.0] * (4 * n))
+        sec = jac_dynamics_quaternion_section(
+            n, ua, xa, i,
+            quat_i_, u_i_,
+            unit_u, to, tf, unit_t, dx,
+            Di, is_hold
+        )
 
-        else:
-            Di = pdict["ps_params"].D(i)
+        quat_rows.append(sec["quaternion"]["row"])
+        quat_cols.append(sec["quaternion"]["col"])
+        quat_data.append(sec["quaternion"]["data"])
+        u_rows.append(sec["u"]["row"])
+        u_cols.append(sec["u"]["col"])
+        u_data.append(sec["u"]["data"])
+        t_rows.append(sec["t"]["row"])
+        t_cols.append(sec["t"]["col"])
+        t_data.append(sec["t"]["data"])
 
-            for j in range(n):
-                grad = dynamics_quaternion_rh_gradient(
-                    quat_i_[j + 1],
-                    u_i_[j],
-                    unit_u,
-                    to,
-                    tf,
-                    unit_t,
-                    dx
-                )
-
-                for jcol in range(n + 1):
-                    if jcol == j + 1:
-                        submat_quat = np.eye(4) * Di[j, jcol] + grad["quaternion"]
-                        jac["quaternion"]["coo"][0].extend(
-                            chain.from_iterable(
-                                repeat(jj, 4)
-                                for jj in range((ua + j) * 4, (ua + j + 1) * 4)
-                            )
-                        )
-                        jac["quaternion"]["coo"][1].extend(list(range((xa + jcol) * 4, (xa + jcol + 1) * 4)) * 4)
-                        jac["quaternion"]["coo"][2].extend(submat_quat.ravel())
-                    else:
-                        jac["quaternion"]["coo"][0].extend(range((ua + j) * 4, (ua + j + 1) * 4))
-                        jac["quaternion"]["coo"][1].extend(range((xa + jcol) * 4, (xa + jcol + 1) * 4))
-                        jac["quaternion"]["coo"][2].extend([Di[j, jcol]] * 4)
-
-
-                jac["u"]["coo"][0].extend(
-                    chain.from_iterable(
-                        repeat(jj, 3) for jj in range((ua + j) * 4, (ua + j + 1) * 4)
-                    )
-                )
-                jac["u"]["coo"][1].extend(
-                    list(range((ua + j) * 3, (ua + j + 1) * 3)) * 4
-                )
-                jac["u"]["coo"][2].extend(grad["u"].ravel())
-
-                jac["t"]["coo"][0].extend(range((ua + j) * 4, (ua + j + 1) * 4))
-                jac["t"]["coo"][1].extend([i] * 4)
-                jac["t"]["coo"][2].extend(grad["to"])
-
-                jac["t"]["coo"][0].extend(range((ua + j) * 4, (ua + j + 1) * 4))
-                jac["t"]["coo"][1].extend([i + 1] * 4)
-                jac["t"]["coo"][2].extend(grad["tf"])
-
-    for key in jac.keys():
-        jac[key]["coo"][0] = np.array(jac[key]["coo"][0], dtype="i4")
-        jac[key]["coo"][1] = np.array(jac[key]["coo"][1], dtype="i4")
-        jac[key]["coo"][2] = np.array(jac[key]["coo"][2], dtype="f8")
+    jac["quaternion"] = {
+        "coo": [
+            np.concatenate(quat_rows).astype("i4"),
+            np.concatenate(quat_cols).astype("i4"),
+            np.concatenate(quat_data),
+        ],
+        "shape": (pdict["N"] * 4, pdict["M"] * 4),
+    }
+    jac["u"] = {
+        "coo": [
+            np.concatenate(u_rows).astype("i4"),
+            np.concatenate(u_cols).astype("i4"),
+            np.concatenate(u_data),
+        ],
+        "shape": (pdict["N"] * 4, pdict["N"] * 3),
+    }
+    jac["t"] = {
+        "coo": [
+            np.concatenate(t_rows).astype("i4"),
+            np.concatenate(t_cols).astype("i4"),
+            np.concatenate(t_data),
+        ],
+        "shape": (pdict["N"] * 4, num_sections + 1),
+    }
 
     return jac

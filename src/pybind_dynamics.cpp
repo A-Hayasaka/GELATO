@@ -249,6 +249,392 @@ py::dict dynamics_quaternion_rh_gradient(
   return grad;
 }
 
+// =============================================================================
+// Batch Jacobian: velocity dynamics
+// Computes all COO entries for one section's velocity Jacobian in C++,
+// eliminating the Python per-node loop and list.extend overhead.
+// =============================================================================
+py::dict jac_dynamics_velocity_section(
+  int n, int ua, int xa, int section_idx,
+  vecXd mass_i, matXd pos_i, matXd vel_i, matXd quat_i,
+  vecXd t_nodes, vecXd param,
+  matXd wind_table, matXd CA_table, vecXd units,
+  double to, double tf, double unit_t, double dx,
+  matXd Di
+) {
+  // Pre-calculate sizes for COO arrays
+  // mass: n entries of 3 each = 3*n
+  // position: n entries of 3*3 each = 9*n
+  // velocity: n entries of (n+1) sub-blocks:
+  //   - one 3x3 dense block (j+1==jcol): 9 entries
+  //   - n diagonal entries (j+1!=jcol): 3 entries each
+  //   total per node: 9 + 3*n => total: n*(9 + 3*n) = 9n + 3n^2
+  // quaternion: n entries of 3*4 = 12*n
+  // t: n entries of 2*3 = 6*n (to and tf)
+
+  const int sz_mass = 3 * n;
+  const int sz_pos  = 9 * n;
+  const int sz_vel  = n * (9 + 3 * n);
+  const int sz_quat = 12 * n;
+  const int sz_t    = 6 * n;
+
+  // Allocate COO arrays
+  Eigen::VectorXi mass_row(sz_mass), mass_col(sz_mass);
+  vecXd mass_data(sz_mass);
+  Eigen::VectorXi pos_row(sz_pos), pos_col(sz_pos);
+  vecXd pos_data(sz_pos);
+  Eigen::VectorXi vel_row(sz_vel), vel_col(sz_vel);
+  vecXd vel_data(sz_vel);
+  Eigen::VectorXi quat_row(sz_quat), quat_col(sz_quat);
+  vecXd quat_data(sz_quat);
+  Eigen::VectorXi t_row(sz_t), t_col(sz_t);
+  vecXd t_data(sz_t);
+
+  int im = 0, ip = 0, iv = 0, iq = 0, it = 0;
+
+  for (int j = 0; j < n; j++) {
+    // Compute gradient for node j+1 (collocation node)
+    double m_j   = mass_i(j + 1);
+    vec3d  p_j   = pos_i.row(j + 1);
+    vec3d  v_j   = vel_i.row(j + 1);
+    vec4d  q_j   = quat_i.row(j + 1);
+    double t_j   = t_nodes(j + 1);
+
+    // --- Compute f_c ---
+    vec3d f_c = dynamics_velocity(m_j, p_j, v_j, q_j, t_j, param,
+                                  wind_table, CA_table, units);
+
+    // --- mass gradient ---
+    vec3d grad_mass;
+    {
+      double m_p = m_j + dx;
+      vec3d f_p = dynamics_velocity(m_p, p_j, v_j, q_j, t_j, param,
+                                    wind_table, CA_table, units);
+      grad_mass = -(f_p - f_c) / dx * (tf - to) * unit_t / 2.0;
+    }
+
+    int row_base = (ua + j) * 3;
+    for (int k = 0; k < 3; k++) {
+      mass_row(im) = row_base + k;
+      mass_col(im) = xa + 1 + j;
+      mass_data(im) = grad_mass(k);
+      im++;
+    }
+
+    // --- position gradient (3x3) ---
+    mat3d grad_position = mat3d::Zero();
+    for (int k = 0; k < 3; k++) {
+      vec3d p_pert = p_j;
+      p_pert(k) += dx;
+      vec3d f_p = dynamics_velocity(m_j, p_pert, v_j, q_j, t_j, param,
+                                    wind_table, CA_table, units);
+      grad_position.col(k) = -(f_p - f_c) / dx * (tf - to) * unit_t / 2.0;
+    }
+
+    // COO: row repeats 3 times for each of 3 columns
+    for (int r = 0; r < 3; r++) {
+      for (int c = 0; c < 3; c++) {
+        pos_row(ip) = row_base + r;
+        pos_col(ip) = (xa + 1 + j) * 3 + c;
+        pos_data(ip) = grad_position(r, c);
+        ip++;
+      }
+    }
+
+    // --- velocity gradient (3x3), only if aero ---
+    mat3d grad_velocity = mat3d::Zero();
+    if (param[2] > 0.0) {
+      for (int k = 0; k < 3; k++) {
+        vec3d v_pert = v_j;
+        v_pert(k) += dx;
+        vec3d f_p = dynamics_velocity(m_j, p_j, v_pert, q_j, t_j, param,
+                                      wind_table, CA_table, units);
+        grad_velocity.col(k) = -(f_p - f_c) / dx * (tf - to) * unit_t / 2.0;
+      }
+    }
+
+    // COO for velocity: iterate over all columns of Di
+    for (int jcol = 0; jcol < n + 1; jcol++) {
+      if (jcol == j + 1) {
+        // Dense 3x3 block: D[j,jcol]*I + grad_velocity
+        for (int r = 0; r < 3; r++) {
+          for (int c = 0; c < 3; c++) {
+            vel_row(iv) = row_base + r;
+            vel_col(iv) = (xa + jcol) * 3 + c;
+            double val = grad_velocity(r, c);
+            if (r == c) val += Di(j, jcol);
+            vel_data(iv) = val;
+            iv++;
+          }
+        }
+      } else {
+        // Diagonal entries: D[j,jcol] on the diagonal
+        for (int k = 0; k < 3; k++) {
+          vel_row(iv) = row_base + k;
+          vel_col(iv) = (xa + jcol) * 3 + k;
+          vel_data(iv) = Di(j, jcol);
+          iv++;
+        }
+      }
+    }
+
+    // --- quaternion gradient (3x4) ---
+    matXd grad_quaternion = matXd::Zero(3, 4);
+    for (int k = 0; k < 4; k++) {
+      vec4d q_pert = q_j;
+      q_pert(k) += dx;
+      vec3d f_p = dynamics_velocity(m_j, p_j, v_j, q_pert, t_j, param,
+                                    wind_table, CA_table, units);
+      grad_quaternion.col(k) = -(f_p - f_c) / dx * (tf - to) * unit_t / 2.0;
+    }
+
+    for (int r = 0; r < 3; r++) {
+      for (int c = 0; c < 4; c++) {
+        quat_row(iq) = row_base + r;
+        quat_col(iq) = (xa + 1 + j) * 4 + c;
+        quat_data(iq) = grad_quaternion(r, c);
+        iq++;
+      }
+    }
+
+    // --- t gradients ---
+    vec3d grad_to_vec = vec3d::Zero();
+    vec3d grad_tf_vec = vec3d::Zero();
+    if (param[2] > 0.0) {
+      double to_p = to + dx;
+      double t_p1 = to_p + t_j / (tf - to) * (tf - to_p);
+      vec3d f_p_to = dynamics_velocity(m_j, p_j, v_j, q_j, t_p1, param,
+                                       wind_table, CA_table, units);
+      grad_to_vec = -(f_p_to * (tf - to_p) - f_c * (tf - to)) / dx * unit_t / 2.0;
+
+      double tf_p = tf + dx;
+      double t_p2 = to + t_j / (tf - to) * (tf_p - to);
+      vec3d f_p_tf = dynamics_velocity(m_j, p_j, v_j, q_j, t_p2, param,
+                                       wind_table, CA_table, units);
+      grad_tf_vec = -(f_p_tf * (tf_p - to) - f_c * (tf - to)) / dx * unit_t / 2.0;
+    } else {
+      grad_to_vec = f_c * unit_t / 2.0;
+      grad_tf_vec = -grad_to_vec;
+    }
+
+    for (int k = 0; k < 3; k++) {
+      t_row(it) = row_base + k;
+      t_col(it) = section_idx;
+      t_data(it) = grad_to_vec(k);
+      it++;
+    }
+    for (int k = 0; k < 3; k++) {
+      t_row(it) = row_base + k;
+      t_col(it) = section_idx + 1;
+      t_data(it) = grad_tf_vec(k);
+      it++;
+    }
+  }
+
+  py::dict result;
+  py::dict mass_coo, pos_coo, vel_coo, quat_coo, t_coo;
+  mass_coo["row"] = mass_row;
+  mass_coo["col"] = mass_col;
+  mass_coo["data"] = mass_data;
+  pos_coo["row"] = pos_row;
+  pos_coo["col"] = pos_col;
+  pos_coo["data"] = pos_data;
+  vel_coo["row"] = vel_row;
+  vel_coo["col"] = vel_col;
+  vel_coo["data"] = vel_data;
+  quat_coo["row"] = quat_row;
+  quat_coo["col"] = quat_col;
+  quat_coo["data"] = quat_data;
+  t_coo["row"] = t_row;
+  t_coo["col"] = t_col;
+  t_coo["data"] = t_data;
+
+  result["mass"] = mass_coo;
+  result["position"] = pos_coo;
+  result["velocity"] = vel_coo;
+  result["quaternion"] = quat_coo;
+  result["t"] = t_coo;
+
+  return result;
+}
+
+// =============================================================================
+// Batch Jacobian: quaternion dynamics
+// Computes all COO entries for one section's quaternion Jacobian in C++.
+// =============================================================================
+py::dict jac_dynamics_quaternion_section(
+  int n, int ua, int xa, int section_idx,
+  matXd quat_i, matXd u_i,
+  double unit_u, double to, double tf, double unit_t, double dx,
+  matXd Di, bool is_hold
+) {
+  if (is_hold) {
+    // Hold/vertical attitude: quat_i[1:] - quat_i[0] = 0
+    // Jacobian: -I for xa*4..(xa+1)*4, +I for (xa+1)*4..xb*4
+    const int sz_quat = 8 * n;  // 4*n for -1 entries + 4*n for +1 entries
+    Eigen::VectorXi quat_row(sz_quat), quat_col(sz_quat);
+    vecXd quat_data(sz_quat);
+
+    int iq = 0;
+    for (int j = 0; j < n; j++) {
+      for (int k = 0; k < 4; k++) {
+        quat_row(iq) = (ua + j) * 4 + k;
+        quat_col(iq) = xa * 4 + k;
+        quat_data(iq) = -1.0;
+        iq++;
+      }
+    }
+    for (int j = 0; j < n; j++) {
+      for (int k = 0; k < 4; k++) {
+        quat_row(iq) = (ua + j) * 4 + k;
+        quat_col(iq) = (xa + 1 + j) * 4 + k;
+        quat_data(iq) = 1.0;
+        iq++;
+      }
+    }
+
+    // Empty u and t
+    Eigen::VectorXi empty_i(0);
+    vecXd empty_d(0);
+
+    py::dict result;
+    py::dict q_coo, u_coo, t_coo;
+    q_coo["row"] = quat_row;
+    q_coo["col"] = quat_col;
+    q_coo["data"] = quat_data;
+    u_coo["row"] = empty_i;
+    u_coo["col"] = empty_i;
+    u_coo["data"] = empty_d;
+    t_coo["row"] = empty_i;
+    t_coo["col"] = empty_i;
+    t_coo["data"] = empty_d;
+
+    result["quaternion"] = q_coo;
+    result["u"] = u_coo;
+    result["t"] = t_coo;
+    return result;
+  }
+
+  // Normal attitude control mode
+  // quaternion COO: n * ((n+1) sub-blocks):
+  //   diagonal (jcol==j+1): 4*4=16 entries
+  //   off-diagonal: 4 entries each, n of them
+  //   total per node: 16 + 4*n => total: n*(16 + 4*n) = 16n + 4n^2
+  // u COO: n * 4*3 = 12*n
+  // t COO: n * 2*4 = 8*n
+
+  const int sz_quat = n * (16 + 4 * n);
+  const int sz_u    = 12 * n;
+  const int sz_t    = 8 * n;
+
+  Eigen::VectorXi quat_row(sz_quat), quat_col(sz_quat);
+  vecXd quat_data(sz_quat);
+  Eigen::VectorXi u_row(sz_u), u_col(sz_u);
+  vecXd u_data(sz_u);
+  Eigen::VectorXi t_row(sz_t), t_col(sz_t);
+  vecXd t_data(sz_t);
+
+  int iq = 0, iu = 0, it = 0;
+
+  for (int j = 0; j < n; j++) {
+    vec4d q_j = quat_i.row(j + 1);
+    vec3d u_j = u_i.row(j);
+
+    // Analytical gradient
+    vec3d omega = u_j * unit_u * M_PI / 180.0;
+    double scale = (tf - to) * unit_t / 2.0;
+
+    // grad_quaternion (4x4)
+    matXd grad_quat = matXd::Zero(4, 4);
+    grad_quat << 0.0, -0.5*omega[0], -0.5*omega[1], -0.5*omega[2],
+                 0.5*omega[0], 0.0, 0.5*omega[2], -0.5*omega[1],
+                 0.5*omega[1], -0.5*omega[2], 0.0, 0.5*omega[0],
+                 0.5*omega[2], 0.5*omega[1], -0.5*omega[0], 0.0;
+    grad_quat = -grad_quat * scale;
+
+    // grad_u (4x3)
+    matXd grad_u = matXd::Zero(4, 3);
+    grad_u << -0.5*q_j[1], -0.5*q_j[2], -0.5*q_j[3],
+               0.5*q_j[0], -0.5*q_j[3],  0.5*q_j[2],
+               0.5*q_j[3],  0.5*q_j[0], -0.5*q_j[1],
+              -0.5*q_j[2],  0.5*q_j[1],  0.5*q_j[0];
+    grad_u = -grad_u * unit_u * M_PI / 180.0 * scale;
+
+    // grad_to, grad_tf (4-vectors)
+    vec4d f_c = dynamics_quaternion(q_j, u_j, unit_u);
+    vec4d grad_to_vec = f_c * unit_t / 2.0;
+    vec4d grad_tf_vec = -grad_to_vec;
+
+    int row_base = (ua + j) * 4;
+
+    // --- quaternion COO ---
+    for (int jcol = 0; jcol < n + 1; jcol++) {
+      if (jcol == j + 1) {
+        // Dense 4x4 block: D[j,jcol]*I + grad_quat
+        for (int r = 0; r < 4; r++) {
+          for (int c = 0; c < 4; c++) {
+            quat_row(iq) = row_base + r;
+            quat_col(iq) = (xa + jcol) * 4 + c;
+            double val = grad_quat(r, c);
+            if (r == c) val += Di(j, jcol);
+            quat_data(iq) = val;
+            iq++;
+          }
+        }
+      } else {
+        // Diagonal entries: D[j,jcol]
+        for (int k = 0; k < 4; k++) {
+          quat_row(iq) = row_base + k;
+          quat_col(iq) = (xa + jcol) * 4 + k;
+          quat_data(iq) = Di(j, jcol);
+          iq++;
+        }
+      }
+    }
+
+    // --- u COO ---
+    for (int r = 0; r < 4; r++) {
+      for (int c = 0; c < 3; c++) {
+        u_row(iu) = row_base + r;
+        u_col(iu) = (ua + j) * 3 + c;
+        u_data(iu) = grad_u(r, c);
+        iu++;
+      }
+    }
+
+    // --- t COO ---
+    for (int k = 0; k < 4; k++) {
+      t_row(it) = row_base + k;
+      t_col(it) = section_idx;
+      t_data(it) = grad_to_vec(k);
+      it++;
+    }
+    for (int k = 0; k < 4; k++) {
+      t_row(it) = row_base + k;
+      t_col(it) = section_idx + 1;
+      t_data(it) = grad_tf_vec(k);
+      it++;
+    }
+  }
+
+  py::dict result;
+  py::dict q_coo, u_coo_d, t_coo;
+  q_coo["row"] = quat_row;
+  q_coo["col"] = quat_col;
+  q_coo["data"] = quat_data;
+  u_coo_d["row"] = u_row;
+  u_coo_d["col"] = u_col;
+  u_coo_d["data"] = u_data;
+  t_coo["row"] = t_row;
+  t_coo["col"] = t_col;
+  t_coo["data"] = t_data;
+
+  result["quaternion"] = q_coo;
+  result["u"] = u_coo_d;
+  result["t"] = t_coo;
+  return result;
+}
+
 PYBIND11_MODULE(dynamics_c, m) {
   m.def("dynamics_velocity_array", &dynamics_velocity_array,
         "velocity with aerodynamic forces (array)");
@@ -258,4 +644,8 @@ PYBIND11_MODULE(dynamics_c, m) {
         "gradient of equality_dynamics_velocity RHS components");
   m.def("dynamics_quaternion_rh_gradient", &dynamics_quaternion_rh_gradient,
         "gradient of equality_dynamics_quaternion RHS components");
+  m.def("jac_dynamics_velocity_section", &jac_dynamics_velocity_section,
+        "Batch Jacobian for velocity dynamics (one section, returns COO arrays)");
+  m.def("jac_dynamics_quaternion_section", &jac_dynamics_quaternion_section,
+        "Batch Jacobian for quaternion dynamics (one section, returns COO arrays)");
 }
