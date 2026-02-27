@@ -35,7 +35,6 @@ from .utils_c import (
     angle_of_attack_all_array_rad,
     q_alpha_array_pa_rad,
 )
-from .coordinate_c import *
 
 
 def dynamic_pressure_dimless(pos_eci_e, vel_eci_e, t_e, wind, units):

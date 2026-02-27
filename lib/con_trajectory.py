@@ -29,7 +29,6 @@
 
 import sys
 import numpy as np
-from .utils_c import *
 from .coordinate_c import conj, quatrot, normalize
 
 

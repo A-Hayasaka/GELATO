@@ -39,7 +39,6 @@ import lib.con_trajectory as con_traj
 import lib.con_aero as con_aero
 import lib.con_dynamics as con_dynamics
 import lib.con_waypoint as con_wp
-from user_constraints import equality_user, inequality_user
 import lib.con_user as con_user
 from lib.cost_gradient import cost_6DoF, cost_jac
 from lib.SectionParameters import PSparams
