@@ -28,7 +28,6 @@
 
 
 import numpy as np
-from .utils_c import *
 from .coordinate_c import (
     geodetic2ecef,
     eci2ecef,

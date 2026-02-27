@@ -23,7 +23,6 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-from numba import jit
 import numpy as np
 from numpy.linalg import norm
 from .coordinate import (
