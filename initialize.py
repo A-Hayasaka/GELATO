@@ -39,8 +39,8 @@ def dynamics_init(x, u, t, param, zlt, wind, ca):
 
     Args:
         x (ndarray) : state vector
-        (mass[kg], posion in ECI frame[m],
-          inertial velocity in ECI frame[m/s],
+        (mass[kg], position in ECEF frame[m],
+          ground velocity in ECEF frame[m/s],
           quaternion from ECI to body frame)
         u (ndarray) : rate in body frame[deg/s]
         t (float64) : time[s]
@@ -57,25 +57,24 @@ def dynamics_init(x, u, t, param, zlt, wind, ca):
     """
 
     mass = x[0]
-    pos_eci = x[1:4]
-    vel_eci = x[4:7]
+    pos_ecef = x[1:4]
+    vel_ecef = x[4:7]
     quat_eci2body = x[7:11]
     d_roll = u[0]
     d_pitch = u[1]
     d_yaw = u[2]
 
-    pos_llh = ecef2geodetic(pos_eci[0], pos_eci[1], pos_eci[2])
+    pos_llh = ecef2geodetic(pos_ecef[0], pos_ecef[1], pos_ecef[2])
     altitude_m = geopotential_altitude(pos_llh[2])
     rho = airdensity_at(altitude_m)
     p = airpressure_at(altitude_m)
 
     # 対気速度
 
-    vel_ecef = vel_eci2ecef(vel_eci, pos_eci, t)
     vel_wind_ned = wind_ned(altitude_m, wind)
-
-    vel_wind_eci = quatrot(quat_nedg2eci(pos_eci, t), vel_wind_ned)
-    vel_air_eci = ecef2eci(vel_ecef, t) - vel_wind_eci
+    vel_wind_ecef = quatrot(quat_nedg2ecef(pos_ecef), vel_wind_ned)
+    vel_air_ecef = vel_ecef - vel_wind_ecef
+    vel_air_eci = ecef2eci(vel_air_ecef, t)
     mach_number = norm(vel_air_eci) / speed_of_sound(altitude_m)
 
     thrust_vac_n = param[0]
@@ -86,8 +85,8 @@ def dynamics_init(x, u, t, param, zlt, wind, ca):
 
     ret = np.zeros(11)
 
-    aero_n_eci = (
-        0.5 * rho * norm(vel_air_eci) * -vel_air_eci * airArea_m2 * airAxialForce_coeff
+    aero_n_ecef = (
+        0.5 * rho * norm(vel_air_ecef) * -vel_air_ecef * airArea_m2 * airAxialForce_coeff
     )
 
     thrust_n = thrust_vac_n - nozzleArea_m2 * p
@@ -95,17 +94,27 @@ def dynamics_init(x, u, t, param, zlt, wind, ca):
         thrustdir_eci = normalize(vel_air_eci)
     else:
         thrustdir_eci = quatrot(conj(quat_eci2body), np.array([1.0, 0.0, 0.0]))
-    thrust_n_eci = thrustdir_eci * thrust_n
-    gravity_eci = gravity(pos_eci)
+    thrust_n_ecef = eci2ecef(thrust_n * thrustdir_eci, t)
+    gravity_ecef = gravity(pos_ecef)
 
-    acc_eci = gravity_eci + (thrust_n_eci + aero_n_eci) / mass
+    omega_earth = 7.2921151467e-5
+    omega_vec = np.array([0.0, 0.0, omega_earth])
+    coriolis = -2.0 * np.cross(omega_vec, vel_ecef)
+    centrifugal = -np.cross(omega_vec, np.cross(omega_vec, pos_ecef))
+
+    acc_ecef = (
+        gravity_ecef
+        + (thrust_n_ecef + aero_n_ecef) / mass
+        + coriolis
+        + centrifugal
+    )
 
     omega_rps_body = np.deg2rad(np.array([0.0, d_roll, d_pitch, d_yaw]))
     d_quat = 0.5 * quatmult(quat_eci2body, omega_rps_body)
 
     ret[0] = -massflow
-    ret[1:4] = vel_eci
-    ret[4:7] = acc_eci
+    ret[1:4] = vel_ecef
+    ret[4:7] = acc_ecef
     ret[7:11] = d_quat
 
     return ret
@@ -196,18 +205,19 @@ def zerolift_turn_correct(x, t, wind=np.zeros((2, 3))):
     """
 
     # mass = x[0]
-    pos_eci = x[1:4]
-    vel_eci = x[4:7]
+    pos_ecef = x[1:4]
+    vel_ecef = x[4:7]
     # quat_eci2body = x[7:11]
 
-    pos_llh = ecef2geodetic(pos_eci[0], pos_eci[1], pos_eci[2])
+    pos_llh = ecef2geodetic(pos_ecef[0], pos_ecef[1], pos_ecef[2])
     altitude_m = geopotential_altitude(pos_llh[2])
 
-    vel_ecef = vel_eci2ecef(vel_eci, pos_eci, t)
     vel_wind_ned = wind_ned(altitude_m, wind)
+    vel_wind_ecef = quatrot(quat_nedg2ecef(pos_ecef), vel_wind_ned)
+    vel_air_ecef = vel_ecef - vel_wind_ecef
 
-    vel_wind_eci = quatrot(quat_nedg2eci(pos_eci, t), vel_wind_ned)
-    vel_air_eci = ecef2eci(vel_ecef, t) - vel_wind_eci
+    vel_air_eci = ecef2eci(vel_air_ecef, t)
+    pos_eci = ecef2eci(pos_ecef, t)
 
     xb_dir = normalize(vel_air_eci)
     yb_dir = normalize(np.cross(vel_air_eci, pos_eci))
@@ -368,7 +378,7 @@ def initialize_xdict_6DoF_from_file(
     xdict["position"] = (
         interp1d(
             x_ref["time"],
-            x_ref[["pos_ECI_X", "pos_ECI_Y", "pos_ECI_Z"]],
+            x_ref[["pos_ECEF_X", "pos_ECEF_Y", "pos_ECEF_Z"]],
             axis=0,
             fill_value="extrapolate",
         )(time_x_nodes)
@@ -377,7 +387,7 @@ def initialize_xdict_6DoF_from_file(
     xdict["velocity"] = (
         interp1d(
             x_ref["time"],
-            x_ref[["vel_ECI_X", "vel_ECI_Y", "vel_ECI_Z"]],
+            x_ref[["vel_ECEF_X", "vel_ECEF_Y", "vel_ECEF_Z"]],
             axis=0,
             fill_value="extrapolate",
         )(time_x_nodes)

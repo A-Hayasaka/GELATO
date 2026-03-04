@@ -37,52 +37,52 @@ from .utils_c import (
 )
 
 
-def dynamic_pressure_dimless(pos_eci_e, vel_eci_e, t_e, wind, units):
+def dynamic_pressure_dimless(pos_ecef_e, vel_ecef_e, t_e, wind, units):
     """Returns dynamic pressure normalized by its maximum value."""
-    pos_eci = pos_eci_e * units[0]
-    vel_eci = vel_eci_e * units[1]
+    pos_ecef = pos_ecef_e * units[0]
+    vel_ecef = vel_ecef_e * units[1]
     t = t_e * units[2]
-    return dynamic_pressure_pa(pos_eci, vel_eci, t, wind) / units[3]
+    return dynamic_pressure_pa(pos_ecef, vel_ecef, t, wind) / units[3]
 
 
-def dynamic_pressure_array_dimless(pos_eci_e, vel_eci_e, t_e, wind, units):
+def dynamic_pressure_array_dimless(pos_ecef_e, vel_ecef_e, t_e, wind, units):
     """Returns array of dynamic pressure for each state values."""
-    pos_eci = pos_eci_e * units[0]
-    vel_eci = vel_eci_e * units[1]
+    pos_ecef = pos_ecef_e * units[0]
+    vel_ecef = vel_ecef_e * units[1]
     t = t_e * units[2]
-    return dynamic_pressure_array_pa(pos_eci, vel_eci, t, wind) / units[3]
+    return dynamic_pressure_array_pa(pos_ecef, vel_ecef, t, wind) / units[3]
 
 
-def angle_of_attack_all_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
+def angle_of_attack_all_dimless(pos_ecef_e, vel_ecef_e, quat, t_e, wind, units):
     """Returns angle of attack normalized by its maximum value."""
-    pos_eci = pos_eci_e * units[0]
-    vel_eci = vel_eci_e * units[1]
+    pos_ecef = pos_ecef_e * units[0]
+    vel_ecef = vel_ecef_e * units[1]
     t = t_e * units[2]
-    return angle_of_attack_all_rad(pos_eci, vel_eci, quat, t, wind) / units[3]
+    return angle_of_attack_all_rad(pos_ecef, vel_ecef, quat, t, wind) / units[3]
 
 
-def angle_of_attack_all_array_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
+def angle_of_attack_all_array_dimless(pos_ecef_e, vel_ecef_e, quat, t_e, wind, units):
     """Returns array of angle of attack for each state values."""
-    pos_eci = pos_eci_e * units[0]
-    vel_eci = vel_eci_e * units[1]
+    pos_ecef = pos_ecef_e * units[0]
+    vel_ecef = vel_ecef_e * units[1]
     t = t_e * units[2]
-    return angle_of_attack_all_array_rad(pos_eci, vel_eci, quat, t, wind) / units[3]
+    return angle_of_attack_all_array_rad(pos_ecef, vel_ecef, quat, t, wind) / units[3]
 
 
-def q_alpha_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
+def q_alpha_dimless(pos_ecef_e, vel_ecef_e, quat, t_e, wind, units):
     """Returns Q-alpha normalized by its maximum value."""
-    pos_eci = pos_eci_e * units[0]
-    vel_eci = vel_eci_e * units[1]
+    pos_ecef = pos_ecef_e * units[0]
+    vel_ecef = vel_ecef_e * units[1]
     t = t_e * units[2]
-    return q_alpha_pa_rad(pos_eci, vel_eci, quat, t, wind) / units[3]
+    return q_alpha_pa_rad(pos_ecef, vel_ecef, quat, t, wind) / units[3]
 
 
-def q_alpha_array_dimless(pos_eci_e, vel_eci_e, quat, t_e, wind, units):
+def q_alpha_array_dimless(pos_ecef_e, vel_ecef_e, quat, t_e, wind, units):
     """Returns array of Q-alpha for each state values."""
-    pos_eci = pos_eci_e * units[0]
-    vel_eci = vel_eci_e * units[1]
+    pos_ecef = pos_ecef_e * units[0]
+    vel_ecef = vel_ecef_e * units[1]
     t = t_e * units[2]
-    return q_alpha_array_pa_rad(pos_eci, vel_eci, quat, t, wind) / units[3]
+    return q_alpha_array_pa_rad(pos_ecef, vel_ecef, quat, t, wind) / units[3]
 
 
 def inequality_max_alpha(xdict, pdict, unitdict, condition):
@@ -308,7 +308,7 @@ def inequality_length_max_qalpha(xdict, pdict, unitdict, condition):
 
 
 def angle_of_attack_all_gradient_dimless(
-    pos_eci_e, vel_eci_e, quat, to, tf, wind, units, time_nodes, dx, n
+    pos_ecef_e, vel_ecef_e, quat, to, tf, wind, units, time_nodes, dx, n
 ):
     """Returns gradient of Q-alpha."""
     ki = range(n)
@@ -320,8 +320,8 @@ def angle_of_attack_all_gradient_dimless(
         "tf": np.zeros(n),
     }
 
-    pos_ki = pos_eci_e[ki]
-    vel_ki = vel_eci_e[ki]
+    pos_ki = pos_ecef_e[ki]
+    vel_ki = vel_ecef_e[ki]
     quat_ki = quat[ki]
 
     t_nodes = time_nodes(to, tf)
@@ -470,7 +470,7 @@ def inequality_jac_max_alpha(xdict, pdict, unitdict, condition):
 
 
 def dynamic_pressure_gradient_dimless(
-    pos_eci_e, vel_eci_e, to, tf, wind, units, time_nodes, dx, n
+    pos_ecef_e, vel_ecef_e, to, tf, wind, units, time_nodes, dx, n
 ):
     """Returns gradient of dynamic pressure."""
     ki = range(n)
@@ -481,8 +481,8 @@ def dynamic_pressure_gradient_dimless(
         "tf": np.zeros(n),
     }
 
-    pos_ki = pos_eci_e[ki]
-    vel_ki = vel_eci_e[ki]
+    pos_ki = pos_ecef_e[ki]
+    vel_ki = vel_ecef_e[ki]
 
     t_nodes = time_nodes(to, tf)
     t_ki = t_nodes[ki]
@@ -605,7 +605,7 @@ def inequality_jac_max_q(xdict, pdict, unitdict, condition):
 
 
 def q_alpha_gradient_dimless(
-    pos_eci_e, vel_eci_e, quat, to, tf, wind, units, time_nodes, dx, n
+    pos_ecef_e, vel_ecef_e, quat, to, tf, wind, units, time_nodes, dx, n
 ):
     """Returns gradient of Q-alpha."""
     ki = range(n)
@@ -617,8 +617,8 @@ def q_alpha_gradient_dimless(
         "tf": np.zeros(n),
     }
 
-    pos_ki = pos_eci_e[ki]
-    vel_ki = vel_eci_e[ki]
+    pos_ki = pos_ecef_e[ki]
+    vel_ki = vel_ecef_e[ki]
     quat_ki = quat[ki]
 
     t_nodes = time_nodes(to, tf)

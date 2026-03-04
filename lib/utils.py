@@ -89,11 +89,11 @@ def wind_ned(altitude_m, wind_data):
     return wind
 
 
-def angle_of_attack_all_rad(pos_eci, vel_eci, quat, t, wind):
+def angle_of_attack_all_rad(pos_ecef, vel_ecef, quat, t, wind):
     """Calculates total angle of attack.
     Args:
-        pos_eci (ndarray) : position in ECI frame [m]
-        vel_eci (ndarray) : inertial velocity in ECI frame [m/s]
+        pos_ecef (ndarray) : position in ECEF frame [m]
+        vel_ecef (ndarray) : ground velocity in ECEF frame [m/s]
         quat (ndarray) : coordinate transformation quaternion from ECI
           to body frame
         t (float64) : time [s]
@@ -104,14 +104,13 @@ def angle_of_attack_all_rad(pos_eci, vel_eci, quat, t, wind):
 
     thrust_dir_eci = quatrot(conj(quat), np.array([1.0, 0.0, 0.0]))
 
-    pos_llh = ecef2geodetic(pos_eci[0], pos_eci[1], pos_eci[2])
+    pos_llh = ecef2geodetic(pos_ecef[0], pos_ecef[1], pos_ecef[2])
     altitude_m = geopotential_altitude(pos_llh[2])
 
-    vel_ecef = vel_eci2ecef(vel_eci, pos_eci, t)
     vel_wind_ned = wind_ned(altitude_m, wind)
-
-    vel_wind_eci = quatrot(quat_nedg2eci(pos_eci, t), vel_wind_ned)
-    vel_air_eci = ecef2eci(vel_ecef, t) - vel_wind_eci
+    vel_wind_ecef = quatrot(quat_nedg2ecef(pos_ecef), vel_wind_ned)
+    vel_air_ecef = vel_ecef - vel_wind_ecef
+    vel_air_eci = ecef2eci(vel_air_ecef, t)
 
     c_alpha = normalize(vel_air_eci).dot(normalize(thrust_dir_eci))
 
@@ -121,19 +120,19 @@ def angle_of_attack_all_rad(pos_eci, vel_eci, quat, t, wind):
         return acos(c_alpha)
 
 
-def angle_of_attack_all_array_rad(pos_eci, vel_eci, quat, t, wind):
+def angle_of_attack_all_array_rad(pos_ecef, vel_ecef, quat, t, wind):
     """Array version of angle_of_attack_all_rad."""
-    alpha = np.zeros(pos_eci.shape[0])
-    for i in range(pos_eci.shape[0]):
-        alpha[i] = angle_of_attack_all_rad(pos_eci[i], vel_eci[i], quat[i], t[i], wind)
+    alpha = np.zeros(pos_ecef.shape[0])
+    for i in range(pos_ecef.shape[0]):
+        alpha[i] = angle_of_attack_all_rad(pos_ecef[i], vel_ecef[i], quat[i], t[i], wind)
     return alpha
 
 
-def angle_of_attack_ab_rad(pos_eci, vel_eci, quat, t, wind):
+def angle_of_attack_ab_rad(pos_ecef, vel_ecef, quat, t, wind):
     """Calculates pitch and yaw angles of attack.
     Args:
-        pos_eci (ndarray) : position in ECI frame [m]
-        vel_eci (ndarray) : inertial velocity in ECI frame [m/s]
+        pos_ecef (ndarray) : position in ECEF frame [m]
+        vel_ecef (ndarray) : ground velocity in ECEF frame [m/s]
         quat (ndarray) : coordinate transformation quaternion from ECI
           to body frame
         t (float64) : time [s]
@@ -142,14 +141,13 @@ def angle_of_attack_ab_rad(pos_eci, vel_eci, quat, t, wind):
         ndarray : pitch and yaw angles of attack [rad]
     """
 
-    pos_llh = ecef2geodetic(pos_eci[0], pos_eci[1], pos_eci[2])
+    pos_llh = ecef2geodetic(pos_ecef[0], pos_ecef[1], pos_ecef[2])
     altitude_m = geopotential_altitude(pos_llh[2])
 
-    vel_ecef = vel_eci2ecef(vel_eci, pos_eci, t)
     vel_wind_ned = wind_ned(altitude_m, wind)
-
-    vel_wind_eci = quatrot(quat_nedg2eci(pos_eci, t), vel_wind_ned)
-    vel_air_eci = ecef2eci(vel_ecef, t) - vel_wind_eci
+    vel_wind_ecef = quatrot(quat_nedg2ecef(pos_ecef), vel_wind_ned)
+    vel_air_ecef = vel_ecef - vel_wind_ecef
+    vel_air_eci = ecef2eci(vel_air_ecef, t)
 
     vel_air_body = quatrot(quat, vel_air_eci)
 
@@ -161,47 +159,46 @@ def angle_of_attack_ab_rad(pos_eci, vel_eci, quat, t, wind):
         return np.array((alpha_z, alpha_y))
 
 
-def dynamic_pressure_pa(pos_eci, vel_eci, t, wind):
+def dynamic_pressure_pa(pos_ecef, vel_ecef, t, wind):
     """Calculates dynamic pressure.
     Args:
-        pos_eci (ndarray) : position in ECI frame [m]
-        vel_eci (ndarray) : inertial velocity in ECI frame [m/s]
+        pos_ecef (ndarray) : position in ECEF frame [m]
+        vel_ecef (ndarray) : ground velocity in ECEF frame [m/s]
         t (float64) : time [s]
         wind (ndarray) : wind table
     Returns:
         float64 : dynamic pressure [Pa]
     """
 
-    pos_llh = ecef2geodetic(pos_eci[0], pos_eci[1], pos_eci[2])
+    pos_llh = ecef2geodetic(pos_ecef[0], pos_ecef[1], pos_ecef[2])
     altitude_m = geopotential_altitude(pos_llh[2])
     rho = airdensity_at(altitude_m)
 
-    vel_ecef = vel_eci2ecef(vel_eci, pos_eci, t)
     vel_wind_ned = wind_ned(altitude_m, wind)
-    vel_wind_eci = quatrot(quat_nedg2eci(pos_eci, t), vel_wind_ned)
-    vel_air_eci = ecef2eci(vel_ecef, t) - vel_wind_eci
+    vel_wind_ecef = quatrot(quat_nedg2ecef(pos_ecef), vel_wind_ned)
+    vel_air_ecef = vel_ecef - vel_wind_ecef
 
-    return 0.5 * vel_air_eci.dot(vel_air_eci) * rho
+    return 0.5 * vel_air_ecef.dot(vel_air_ecef) * rho
 
 
-def dynamic_pressure_array_pa(pos_eci, vel_eci, t, wind):
+def dynamic_pressure_array_pa(pos_ecef, vel_ecef, t, wind):
     """Array version of dynamic_pressure_pa."""
-    q = np.zeros(pos_eci.shape[0])
-    for i in range(pos_eci.shape[0]):
-        q[i] = dynamic_pressure_pa(pos_eci[i], vel_eci[i], t[i], wind)
+    q = np.zeros(pos_ecef.shape[0])
+    for i in range(pos_ecef.shape[0]):
+        q[i] = dynamic_pressure_pa(pos_ecef[i], vel_ecef[i], t[i], wind)
     return q
 
 
-def q_alpha_pa_rad(pos_eci, vel_eci, quat, t, wind):
+def q_alpha_pa_rad(pos_ecef, vel_ecef, quat, t, wind):
     """Calculates Q_alpha."""
-    alpha = angle_of_attack_all_rad(pos_eci, vel_eci, quat, t, wind)
-    q = dynamic_pressure_pa(pos_eci, vel_eci, t, wind)
+    alpha = angle_of_attack_all_rad(pos_ecef, vel_ecef, quat, t, wind)
+    q = dynamic_pressure_pa(pos_ecef, vel_ecef, t, wind)
     return q * alpha
 
 
-def q_alpha_array_pa_rad(pos_eci, vel_eci, quat, t, wind):
+def q_alpha_array_pa_rad(pos_ecef, vel_ecef, quat, t, wind):
     """Array version of q_alpha_pa_rad."""
-    qa = np.zeros(pos_eci.shape[0])
-    for i in range(pos_eci.shape[0]):
-        qa[i] = q_alpha_pa_rad(pos_eci[i], vel_eci[i], quat[i], t[i], wind)
+    qa = np.zeros(pos_ecef.shape[0])
+    for i in range(pos_ecef.shape[0]):
+        qa[i] = q_alpha_pa_rad(pos_ecef[i], vel_ecef[i], quat[i], t[i], wind)
     return qa

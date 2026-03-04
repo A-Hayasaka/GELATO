@@ -259,7 +259,9 @@ def equality_dynamics_velocity(xdict, pdict, unitdict, condition):
                 dynamics_velocity_NoAir(
                     mass_i_[1:],
                     pos_i_[1:],
+                    vel_i_[1:],
                     quat_i_[1:],
+                    t_nodes[1:],
                     param,
                     units,
                 )
@@ -344,7 +346,7 @@ def equality_jac_dynamics_velocity(xdict, pdict, unitdict, condition):
 
         def dynamics(mass, pos, vel, quat, t):
             if param[2] == 0.0:
-                return dynamics_velocity_NoAir(mass, pos, quat, param, units)
+                return dynamics_velocity_NoAir(mass, pos, vel, quat, t, param, units)
             else:
                 return dynamics_velocity(
                     mass, pos, vel, quat, t, param, wind, ca, units

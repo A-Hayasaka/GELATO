@@ -31,6 +31,8 @@ from .coordinate_c import (
     inclination_rad,
     angular_momentum_from_altitude,
     orbit_energy_from_altitude,
+    ecef2eci,
+    vel_ecef2eci,
 )
 
 
@@ -333,11 +335,15 @@ def equality_6DoF_LGR_terminal(xdict, pdict, unitdict, condition):
 
     unit_pos = unitdict["position"]
     unit_vel = unitdict["velocity"]
+    unit_t = unitdict["t"]
 
-    # terminal conditions
+    # terminal conditions (convert ECEF state to ECI for orbital mechanics)
 
-    pos_f = xdict["position"][-3:] * unit_pos
-    vel_f = xdict["velocity"][-3:] * unit_vel
+    pos_ecef_f = xdict["position"][-3:] * unit_pos
+    vel_ecef_f = xdict["velocity"][-3:] * unit_vel
+    t_f = xdict["t"][-1] * unit_t
+    pos_f = ecef2eci(pos_ecef_f, t_f)
+    vel_f = vel_ecef2eci(vel_ecef_f, pos_ecef_f, t_f)
 
     GMe = 3.986004418e14
     if (

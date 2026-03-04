@@ -27,68 +27,84 @@
 #include "wrapper_coordinate.hpp"
 #include "wrapper_utils.hpp"
 
-matXd dynamics_velocity(vecXd mass_e, matXd pos_eci_e, matXd vel_eci_e,
+matXd dynamics_velocity(vecXd mass_e, matXd pos_ecef_e, matXd vel_ecef_e,
                         matXd quat_eci2body, vecXd t, vecXd param,
                         matXd wind_table, matXd CA_table, vecXd units) {
   vecXd mass = mass_e * units[0];
-  matXd pos_eci = pos_eci_e * units[1];
-  matXd vel_eci = vel_eci_e * units[2];
-  matXd acc_eci = matXd::Zero(pos_eci.rows(), 3);
+  matXd pos_ecef = pos_ecef_e * units[1];
+  matXd vel_ecef = vel_ecef_e * units[2];
+  matXd acc_ecef = matXd::Zero(pos_ecef.rows(), 3);
 
   double thrust_vac = param[0];
   double air_area = param[2];
   double nozzle_area = param[4];
 
+  const double omega_earth = 7.2921151467e-5;
+
   for (int i = 0; i < mass.rows(); i++) {
-    vec3d pos_llh = ecef2geodetic(pos_eci(i, 0), pos_eci(i, 1), pos_eci(i, 2));
+    vec3d pos_llh =
+        ecef2geodetic(pos_ecef(i, 0), pos_ecef(i, 1), pos_ecef(i, 2));
     double altitude = geopotential_altitude(pos_llh[2]);
     double rho = airdensity_at(altitude);
     double p = airpressure_at(altitude);
 
-    vec3d vel_ecef = vel_eci2ecef(vel_eci.row(i), pos_eci.row(i), t[i]);
     vec3d vel_wind_ned = wind_ned(altitude, wind_table);
-
-    vec3d vel_wind_eci =
-        quatrot(quat_nedg2eci(pos_eci.row(i), t[i]), vel_wind_ned);
-    vec3d vel_air_eci = ecef2eci(vel_ecef, t[i]) - vel_wind_eci;
-    double mach_number = vel_air_eci.norm() / speed_of_sound(altitude);
+    vec3d vel_wind_ecef =
+        quatrot(quat_nedg2ecef(pos_ecef.row(i)), vel_wind_ned);
+    vec3d vel_air_ecef = vel_ecef.row(i) - vel_wind_ecef;
+    double mach_number = vel_air_ecef.norm() / speed_of_sound(altitude);
 
     double ca = interp(mach_number, CA_table.col(0), CA_table.col(1));
 
-    vec3d aeroforce_eci =
-        0.5 * rho * air_area * ca * vel_air_eci.norm() * -vel_air_eci;
+    vec3d aeroforce_ecef =
+        0.5 * rho * air_area * ca * vel_air_ecef.norm() * -vel_air_ecef;
 
     double thrust = thrust_vac - nozzle_area * p;
     vec3d thrustdir_eci =
         quatrot(conj(quat_eci2body.row(i)), vec3d(1.0, 0.0, 0.0));
-    vec3d thrust_eci = thrust * thrustdir_eci;
-    vec3d gravity_eci = gravity(pos_eci.row(i));
-    vec3d acc_i = (thrust_eci + aeroforce_eci) / mass[i] + gravity_eci;
-    acc_eci.row(i) = acc_i;
+    vec3d thrust_ecef = eci2ecef(thrust * thrustdir_eci, t[i]);
+    vec3d gravity_ecef = gravity(pos_ecef.row(i));
+
+    vec3d omega(0.0, 0.0, omega_earth);
+    vec3d coriolis = -2.0 * omega.cross(vel_ecef.row(i));
+    vec3d centrifugal = -omega.cross(omega.cross(pos_ecef.row(i)));
+
+    vec3d acc_i = (thrust_ecef + aeroforce_ecef) / mass[i] + gravity_ecef +
+                  coriolis + centrifugal;
+    acc_ecef.row(i) = acc_i;
   }
 
-  return acc_eci / units[2];
+  return acc_ecef / units[2];
 }
 
-matXd dynamics_velocity_NoAir(vecXd mass_e, matXd pos_eci_e,
-                              matXd quat_eci2body, vecXd param, vecXd units) {
+matXd dynamics_velocity_NoAir(vecXd mass_e, matXd pos_ecef_e,
+                               matXd vel_ecef_e, matXd quat_eci2body,
+                               vecXd t, vecXd param, vecXd units) {
   vecXd mass = mass_e * units[0];
-  matXd pos_eci = pos_eci_e * units[1];
-  matXd acc_eci = matXd::Zero(pos_eci.rows(), 3);
+  matXd pos_ecef = pos_ecef_e * units[1];
+  matXd vel_ecef = vel_ecef_e * units[2];
+  matXd acc_ecef = matXd::Zero(pos_ecef.rows(), 3);
 
   double thrust_vac = param[0];
+  const double omega_earth = 7.2921151467e-5;
 
   for (int i = 0; i < mass.rows(); i++) {
     double thrust = thrust_vac;
     vec3d thrustdir_eci =
         quatrot(conj(quat_eci2body.row(i)), vec3d(1.0, 0.0, 0.0));
-    vec3d thrust_eci = thrust * thrustdir_eci;
-    vec3d gravity_eci = gravity(pos_eci.row(i));
-    vec3d acc_i = thrust_eci / mass[i] + gravity_eci;
-    acc_eci.row(i) = acc_i;
+    vec3d thrust_ecef = eci2ecef(thrust * thrustdir_eci, t[i]);
+    vec3d gravity_ecef = gravity(pos_ecef.row(i));
+
+    vec3d omega(0.0, 0.0, omega_earth);
+    vec3d coriolis = -2.0 * omega.cross(vel_ecef.row(i));
+    vec3d centrifugal = -omega.cross(omega.cross(pos_ecef.row(i)));
+
+    vec3d acc_i =
+        thrust_ecef / mass[i] + gravity_ecef + coriolis + centrifugal;
+    acc_ecef.row(i) = acc_i;
   }
 
-  return acc_eci / units[2];
+  return acc_ecef / units[2];
 }
 
 matXd dynamics_quaternion(matXd quat_eci2body, matXd u_e, double unit_u) {
