@@ -227,6 +227,7 @@ def posLLH_IIP_gradient(pos_ECEF, vel_ECEF, t, unit_pos, unit_vel, unit_t, dx):
         vel_ECEF[j] -= dx
         grad["velocity"][:, j] = (f_pv - f_center) / dx
 
+    # IIP in ECEF frame is time-independent; gradient with respect to t is zero
     grad["t"] = np.zeros(3)
 
     return grad
@@ -554,6 +555,7 @@ def posLLH_gradient(pos_ECEF, t, unit_pos, unit_t, dx):
         pos_ECEF[j] -= dx
         grad["position"][:, j] = (f_pr - f_center) / dx
 
+    # geodetic conversion from ECEF is time-independent; gradient with respect to t is zero
     grad["t"] = np.zeros(3)
 
     return grad
@@ -580,6 +582,7 @@ def downrange_gradient(pos_ECEF, t, unit_pos, unit_t, lat0, lon0, dx):
         pos_ECEF[j] -= dx
         grad["position"][j] = (f_pr - f_center) / dx
 
+    # downrange from ECEF position is time-independent; gradient with respect to t is zero
     grad["t"] = 0.0
 
     return grad

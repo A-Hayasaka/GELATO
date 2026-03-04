@@ -88,6 +88,7 @@ vec3d wind_ned(double altitude_m, matXd wind_data) {
 
 double angle_of_attack_all_rad(vec3d pos_ecef, vec3d vel_ecef, vec4d quat,
                                double t, matXd wind) {
+  // thrust direction is computed in ECI frame using quat_eci2body quaternion
   vec3d thrust_dir_eci = quatrot(conj(quat), vec3d(1.0, 0.0, 0.0));
 
   vec3d pos_llh = ecef2geodetic(pos_ecef[0], pos_ecef[1], pos_ecef[2]);
