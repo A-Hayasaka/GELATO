@@ -166,9 +166,9 @@ def display_6DoF(out, flag_savefig=False):
 
 
 def display_3d(out):
-    x_km = out["pos_ECI_X"].to_numpy() / 1000.0
-    y_km = out["pos_ECI_Y"].to_numpy() / 1000.0
-    z_km = out["pos_ECI_Z"].to_numpy() / 1000.0
+    x_km = out["pos_ECEF_X"].to_numpy() / 1000.0
+    y_km = out["pos_ECEF_Y"].to_numpy() / 1000.0
+    z_km = out["pos_ECEF_Z"].to_numpy() / 1000.0
 
     thetas = np.linspace(0, np.pi, 20)
     phis = np.linspace(0, np.pi * 2, 20)

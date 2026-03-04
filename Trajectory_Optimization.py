@@ -136,10 +136,10 @@ pdict["N"] = N
 pdict["M"] = N + num_sections
 pdict["num_sections"] = num_sections
 
-r_init = launchsite_eci
-v_init = vel_ecef2eci(np.zeros(3), launchsite_ecef, t_init)
+r_init = launchsite_ecef
+v_init = np.zeros(3)
 quat_init = quatmult(
-    quat_eci2nedg(r_init, t_init),
+    quat_eci2nedg(launchsite_eci, t_init),
     quat_from_euler(launch_conditions["flight_azimuth_init"], 90.0, 0.0),
 )
 m_init = sum([s["mass_dry"] + s["mass_propellant"] for s in stages.values()])

@@ -30,21 +30,17 @@
 import numpy as np
 from .coordinate_c import (
     geodetic2ecef,
-    eci2ecef,
+    ecef2geodetic,
     normalize,
     quatrot,
     quat_nedg2ecef,
-    vel_eci2ecef,
-    eci2geodetic,
     distance_vincenty,
 )
 from .IIP_c import posLLH_IIP_FAA
 
 
 def sin_elevation(pos_, t_, posECEF_ANT, unit_pos, unit_t):
-    pos = pos_ * unit_pos
-    to = t_ * unit_t
-    posECEF = eci2ecef(pos, to)
+    posECEF = pos_ * unit_pos
     direction_ANT = normalize(posECEF - posECEF_ANT)
     vertical_ANT = quatrot(quat_nedg2ecef(posECEF_ANT), np.array([0, 0, -1.0]))
     return np.dot(direction_ANT, vertical_ANT)
@@ -186,9 +182,8 @@ def equality_IIP(xdict, pdict, unitdict, condition):
             xa = pdict["ps_params"].index_start_x(i)
             pos = pos_[xa] * unit_pos
             vel = vel_[xa] * unit_vel
-            to = t[i] * unit_t
-            posECEF = eci2ecef(pos, to)
-            velECEF = vel_eci2ecef(vel, pos, to)
+            posECEF = pos
+            velECEF = vel
             posLLH_IIP = posLLH_IIP_FAA(posECEF, velECEF)
             # latitude
             if "lat_IIP" in waypoint:
@@ -206,35 +201,34 @@ def equality_IIP(xdict, pdict, unitdict, condition):
         return np.concatenate(con, axis=None)
 
 
-def posLLH_IIP_gradient(pos_ECI, vel_ECI, t, unit_pos, unit_vel, unit_t, dx):
+def posLLH_IIP_gradient(pos_ECEF, vel_ECEF, t, unit_pos, unit_vel, unit_t, dx):
     grad = {
         "position": np.zeros((3, 3)),
         "velocity": np.zeros((3, 3)),
         "t": np.zeros(3),
     }
 
-    def iip_from_eci(pos_, vel_, t_):
+    def iip_from_ecef(pos_, vel_, t_):
         return posLLH_IIP_FAA(
-            eci2ecef(pos_ * unit_pos, t_ * unit_t),
-            vel_eci2ecef(vel_ * unit_vel, pos_ * unit_pos, t_ * unit_t),
+            pos_ * unit_pos,
+            vel_ * unit_vel,
         )
 
-    f_center = iip_from_eci(pos_ECI, vel_ECI, t)
+    f_center = iip_from_ecef(pos_ECEF, vel_ECEF, t)
 
     for j in range(3):
-        pos_ECI[j] += dx
-        f_pr = iip_from_eci(pos_ECI, vel_ECI, t)
-        pos_ECI[j] -= dx
+        pos_ECEF[j] += dx
+        f_pr = iip_from_ecef(pos_ECEF, vel_ECEF, t)
+        pos_ECEF[j] -= dx
         grad["position"][:, j] = (f_pr - f_center) / dx
 
-        vel_ECI[j] += dx
-        f_pv = iip_from_eci(pos_ECI, vel_ECI, t)
-        vel_ECI[j] -= dx
+        vel_ECEF[j] += dx
+        f_pv = iip_from_ecef(pos_ECEF, vel_ECEF, t)
+        vel_ECEF[j] -= dx
         grad["velocity"][:, j] = (f_pv - f_center) / dx
 
-    t += dx
-    f_pt = iip_from_eci(pos_ECI, vel_ECI, t)
-    grad["t"] = (f_pt - f_center) / dx
+    # IIP in ECEF frame is time-independent; gradient with respect to t is zero
+    grad["t"] = np.zeros(3)
 
     return grad
 
@@ -352,9 +346,8 @@ def inequality_IIP(xdict, pdict, unitdict, condition):
             xa = pdict["ps_params"].index_start_x(i)
             pos = pos_[xa] * unit_pos
             vel = vel_[xa] * unit_vel
-            to = t[i] * unit_t
-            posECEF = eci2ecef(pos, to)
-            velECEF = vel_eci2ecef(vel, pos, to)
+            posECEF = pos
+            velECEF = vel
             posLLH_IIP = posLLH_IIP_FAA(posECEF, velECEF)
             # latitude
             if "lat_IIP" in waypoint:
@@ -526,8 +519,7 @@ def equality_posLLH(xdict, pdict, unitdict, condition):
             waypoint = condition["waypoint"][section_name]
             xa = pdict["ps_params"].index_start_x(i)
             pos = pos_[xa] * unit_pos
-            to = t[i] * unit_t
-            posLLH = eci2geodetic(pos, to)
+            posLLH = ecef2geodetic(pos[0], pos[1], pos[2])
             lon_origin = pdict["LaunchCondition"]["lon"]
             lat_origin = pdict["LaunchCondition"]["lat"]
             downrange = distance_vincenty(lat_origin, lon_origin, posLLH[0], posLLH[1])
@@ -548,32 +540,33 @@ def equality_posLLH(xdict, pdict, unitdict, condition):
         return np.concatenate(con, axis=None)
 
 
-def posLLH_gradient(pos_ECI, t, unit_pos, unit_t, dx):
+def posLLH_gradient(pos_ECEF, t, unit_pos, unit_t, dx):
     grad = {"position": np.zeros((3, 3)), "t": np.zeros(3)}
 
     def pos_llh(pos_, t_):
-        return eci2geodetic(pos_ * unit_pos, t_ * unit_t)
+        pos = pos_ * unit_pos
+        return ecef2geodetic(pos[0], pos[1], pos[2])
 
-    f_center = pos_llh(pos_ECI, t)
+    f_center = pos_llh(pos_ECEF, t)
 
     for j in range(3):
-        pos_ECI[j] += dx
-        f_pr = pos_llh(pos_ECI, t)
-        pos_ECI[j] -= dx
+        pos_ECEF[j] += dx
+        f_pr = pos_llh(pos_ECEF, t)
+        pos_ECEF[j] -= dx
         grad["position"][:, j] = (f_pr - f_center) / dx
 
-    t += dx
-    f_pt = pos_llh(pos_ECI, t)
-    grad["t"] = (f_pt - f_center) / dx
+    # geodetic conversion from ECEF is time-independent; gradient with respect to t is zero
+    grad["t"] = np.zeros(3)
 
     return grad
 
 
-def downrange_gradient(pos_ECI, t, unit_pos, unit_t, lat0, lon0, dx):
+def downrange_gradient(pos_ECEF, t, unit_pos, unit_t, lat0, lon0, dx):
     grad = {"position": np.zeros(3), "t": 0.0}
 
     def downrange(pos_, t_):
-        pos_llh = eci2geodetic(pos_ * unit_pos, t_ * unit_t)
+        pos = pos_ * unit_pos
+        pos_llh = ecef2geodetic(pos[0], pos[1], pos[2])
         return distance_vincenty(
             lat0,
             lon0,
@@ -581,17 +574,16 @@ def downrange_gradient(pos_ECI, t, unit_pos, unit_t, lat0, lon0, dx):
             pos_llh[1],
         )
 
-    f_center = downrange(pos_ECI, t)
+    f_center = downrange(pos_ECEF, t)
 
     for j in range(3):
-        pos_ECI[j] += dx
-        f_pr = downrange(pos_ECI, t)
-        pos_ECI[j] -= dx
+        pos_ECEF[j] += dx
+        f_pr = downrange(pos_ECEF, t)
+        pos_ECEF[j] -= dx
         grad["position"][j] = (f_pr - f_center) / dx
 
-    t += dx
-    f_pt = downrange(pos_ECI, t)
-    grad["t"] = (f_pt - f_center) / dx
+    # downrange from ECEF position is time-independent; gradient with respect to t is zero
+    grad["t"] = 0.0
 
     return grad
 
@@ -700,8 +692,7 @@ def inequality_posLLH(xdict, pdict, unitdict, condition):
             waypoint = condition["waypoint"][section_name]
             xa = pdict["ps_params"].index_start_x(i)
             pos = pos_[xa] * unit_pos
-            to = t[i] * unit_t
-            posLLH = eci2geodetic(pos, to)
+            posLLH = ecef2geodetic(pos[0], pos[1], pos[2])
             lon_origin = pdict["LaunchCondition"]["lon"]
             lat_origin = pdict["LaunchCondition"]["lat"]
             downrange = distance_vincenty(lat_origin, lon_origin, posLLH[0], posLLH[1])

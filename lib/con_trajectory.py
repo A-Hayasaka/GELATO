@@ -32,10 +32,10 @@ import numpy as np
 from .coordinate_c import conj, quatrot, normalize
 
 
-def yb_r_dot(pos_eci, quat_eci2body):
+def yb_r_dot(pos_ecef, quat_eci2body):
     """Returns sine of roll angles."""
     yb_dir_eci = quatrot(conj(quat_eci2body), np.array([0.0, 1.0, 0.0]))
-    return yb_dir_eci.dot(normalize(pos_eci))
+    return yb_dir_eci.dot(normalize(pos_ecef))
 
 
 def roll_direction_array(pos, quat):

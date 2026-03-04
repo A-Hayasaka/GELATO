@@ -29,10 +29,10 @@ from .coordinate import (
     quatrot,
     conj,
     quatmult,
-    vel_eci2ecef,
-    quat_nedg2eci,
+    quat_nedg2ecef,
     ecef2geodetic,
     ecef2eci,
+    eci2ecef,
     gravity,
 )
 from .USStandardAtmosphere import (
@@ -45,65 +45,83 @@ from .utils import wind_ned
 
 
 def dynamics_velocity(
-    mass_e, pos_eci_e, vel_eci_e, quat_eci2body, t, param, wind_table, CA_table, units
+    mass_e, pos_ecef_e, vel_ecef_e, quat_eci2body, t, param, wind_table, CA_table, units
 ):
-    """Equation of motion of velocity."""
+    """Equation of motion of velocity in ECEF frame."""
 
     mass = mass_e * units[0]
-    pos_eci = pos_eci_e * units[1]
-    vel_eci = vel_eci_e * units[2]
-    acc_eci = np.zeros(vel_eci_e.shape)
+    pos_ecef = pos_ecef_e * units[1]
+    vel_ecef = vel_ecef_e * units[2]
+    acc_ecef = np.zeros(vel_ecef_e.shape)
 
     thrust_vac = param[0]
     air_area = param[2]
     nozzle_area = param[4]
 
+    omega_earth = 7.2921151467e-5
+    omega_vec = np.array([0.0, 0.0, omega_earth])
+
     for i in range(len(mass)):
-        pos_llh = ecef2geodetic(pos_eci[i, 0], pos_eci[i, 1], pos_eci[i, 2])
+        pos_llh = ecef2geodetic(pos_ecef[i, 0], pos_ecef[i, 1], pos_ecef[i, 2])
         altitude = geopotential_altitude(pos_llh[2])
         rho = airdensity_at(altitude)
         p = airpressure_at(altitude)
 
-        vel_ecef = vel_eci2ecef(vel_eci[i], pos_eci[i], t[i])
         vel_wind_ned = wind_ned(altitude, wind_table)
-
-        vel_wind_eci = quatrot(quat_nedg2eci(pos_eci[i], t[i]), vel_wind_ned)
-        vel_air_eci = ecef2eci(vel_ecef, t[i]) - vel_wind_eci
-        mach_number = norm(vel_air_eci) / speed_of_sound(altitude)
+        vel_wind_ecef = quatrot(quat_nedg2ecef(pos_ecef[i]), vel_wind_ned)
+        vel_air_ecef = vel_ecef[i] - vel_wind_ecef
+        mach_number = norm(vel_air_ecef) / speed_of_sound(altitude)
 
         ca = np.interp(mach_number, CA_table[:, 0], CA_table[:, 1])
 
-        aeroforce_eci = 0.5 * rho * norm(vel_air_eci) * -vel_air_eci * air_area * ca
+        aeroforce_ecef = 0.5 * rho * norm(vel_air_ecef) * -vel_air_ecef * air_area * ca
 
         thrust = thrust_vac - nozzle_area * p
         thrustdir_eci = quatrot(conj(quat_eci2body[i]), np.array([1.0, 0.0, 0.0]))
-        thrust_eci = thrustdir_eci * thrust
-        gravity_eci = gravity(pos_eci[i])
+        thrust_ecef = eci2ecef(thrust * thrustdir_eci, t[i])
+        gravity_ecef = gravity(pos_ecef[i])
 
-        acc_eci[i] = gravity_eci + (thrust_eci + aeroforce_eci) / mass[i]
+        coriolis = -2.0 * np.cross(omega_vec, vel_ecef[i])
+        centrifugal = -np.cross(omega_vec, np.cross(omega_vec, pos_ecef[i]))
 
-    return acc_eci / units[2]
+        acc_ecef[i] = (
+            gravity_ecef
+            + (thrust_ecef + aeroforce_ecef) / mass[i]
+            + coriolis
+            + centrifugal
+        )
+
+    return acc_ecef / units[2]
 
 
-def dynamics_velocity_NoAir(mass_e, pos_eci_e, quat_eci2body, param, units):
-    """Equation of motion of velocity."""
+def dynamics_velocity_NoAir(mass_e, pos_ecef_e, vel_ecef_e, quat_eci2body, t, param, units):
+    """Equation of motion of velocity in ECEF frame (no aerodynamics)."""
 
     mass = mass_e * units[0]
-    pos_eci = pos_eci_e * units[1]
-    acc_eci = np.zeros(pos_eci_e.shape)
+    pos_ecef = pos_ecef_e * units[1]
+    vel_ecef = vel_ecef_e * units[2]
+    acc_ecef = np.zeros(pos_ecef_e.shape)
 
     thrust_vac = param[0]
+
+    omega_earth = 7.2921151467e-5
+    omega_vec = np.array([0.0, 0.0, omega_earth])
 
     for i in range(len(mass)):
 
         thrust = thrust_vac
         thrustdir_eci = quatrot(conj(quat_eci2body[i]), np.array([1.0, 0.0, 0.0]))
-        thrust_eci = thrustdir_eci * thrust
-        gravity_eci = gravity(pos_eci[i])
+        thrust_ecef = eci2ecef(thrust * thrustdir_eci, t[i])
+        gravity_ecef = gravity(pos_ecef[i])
 
-        acc_eci[i] = gravity_eci + (thrust_eci) / mass[i]
+        coriolis = -2.0 * np.cross(omega_vec, vel_ecef[i])
+        centrifugal = -np.cross(omega_vec, np.cross(omega_vec, pos_ecef[i]))
 
-    return acc_eci / units[2]
+        acc_ecef[i] = (
+            gravity_ecef + thrust_ecef / mass[i] + coriolis + centrifugal
+        )
+
+    return acc_ecef / units[2]
 
 
 def dynamics_quaternion(quat_eci2body, u_e, unit_u):
